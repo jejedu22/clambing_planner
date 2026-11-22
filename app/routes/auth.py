@@ -6,11 +6,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..models import User
+from ..models import User, UserPref
 from ..security import (
     DUMMY_HASH, current_user_optional, hash_password, login_required, password_error,
-    verify_password,
+    session_epoch, verify_password,
 )
+from ..services import tokens
 from ..web import flash, render
 
 router = APIRouter()
@@ -53,6 +54,7 @@ def login(request: Request, email: str = Form(...), password: str = Form(...),
     _failures.pop(key, None)
     request.session.clear()  # nouvelle session après connexion
     request.session["uid"] = user.id
+    request.session["ep"] = session_epoch(db, user.id)
     return RedirectResponse("/", status_code=303)
 
 
@@ -63,8 +65,9 @@ def logout(request: Request):
 
 
 @router.get("/password")
-def password_form(request: Request, user: User = Depends(login_required)):
-    return render(request, "password.html")
+def password_form(request: Request, user: User = Depends(login_required), db: Session = Depends(get_db)):
+    pref = db.get(UserPref, user.id)
+    return render(request, "password.html", notify=pref.notify_email if pref else True)
 
 
 @router.post("/password")
@@ -79,9 +82,12 @@ def password_change(request: Request, current: str = Form(...), new: str = Form(
     else:
         error = password_error(new)
     if error:
-        return render(request, "password.html", 400, error=error)
+        pref = db.get(UserPref, user.id)
+        return render(request, "password.html", 400, error=error, notify=pref.notify_email if pref else True)
     user.password_hash = hash_password(new)
     user.must_change_password = False
+    epoch = tokens.bump_epoch(db, user.id)   # déconnecte les autres appareils
     db.commit()
-    flash(request, "Mot de passe modifié.", "ok")
+    request.session["ep"] = epoch
+    flash(request, "Mot de passe modifié. Les autres appareils ont été déconnectés.", "ok")
     return RedirectResponse("/", status_code=303)

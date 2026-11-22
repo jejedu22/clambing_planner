@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% from "_club_picker.html" import picker, hidden with context %}
+{% block title %}Intégrations — Climbing Planner{% endblock %}
+{% block content %}
+<h1>Intégrations{% if club %} <small class="muted">— {{ club.name }}</small>{% endif %}</h1>
+{{ picker(clubs, club, '/admin/integrations') }}
+{% if ha_ok %}<div class="flash ok">{{ ha_ok }}</div>{% endif %}
+{% if not club %}
+  <p class="muted">Choisissez un club pour configurer ses intégrations.</p>
+{% else %}
+
+<section class="card">
+  <h2>✉️ Mailjet — envoi d'emails</h2>
+  <p class="muted">Utilisé pour le mot de passe oublié, les invitations et les notifications de sorties de <strong>{{ club.name }}</strong>.
+    Créez une clé API dans votre compte Mailjet et validez l'adresse d'expéditeur (<em>Senders &amp; domains</em>).</p>
+  {% if not base_url_ok %}<div class="flash error">La variable <code>APP_BASE_URL</code> n'est pas définie sur le serveur : les emails contenant un lien (mot de passe oublié, invitation) ne peuvent pas être envoyés.</div>{% endif %}
+  <p>Statut : {% if integ and integ.mailjet_ready %}<span class="badge">✅ Configuré</span>{% else %}<span class="badge warn">Non configuré</span>{% endif %}</p>
+  <form method="post" action="/admin/integrations/mailjet">
+    <input type="hidden" name="csrf" value="{{ csrf }}">{{ hidden(club) }}
+    <label>Clé API (publique) <input name="api_key" required value="{{ integ.mj_api_key if integ and integ.mj_api_key else '' }}" autocomplete="off"></label>
+    <label>Clé secrète {% if integ and integ.mj_api_secret_enc %}<small class="muted">(enregistrée — laisser vide pour la conserver)</small>{% endif %}
+      <input type="password" name="api_secret" autocomplete="new-password" placeholder="{{ '••••••••' if integ and integ.mj_api_secret_enc else '' }}"></label>
+    <label>Adresse d'expéditeur <input type="email" name="from_email" required value="{{ integ.mj_from_email if integ and integ.mj_from_email else '' }}"></label>
+    <label>Nom d'expéditeur <input name="from_name" maxlength="120" value="{{ integ.mj_from_name if integ and integ.mj_from_name else club.name }}"></label>
+    <button>Enregistrer</button>
+  </form>
+  {% if integ and integ.mailjet_ready %}
+  <div class="actions" style="margin-top:.8rem">
+    <form method="post" action="/admin/integrations/mailjet/check"><input type="hidden" name="csrf" value="{{ csrf }}">{{ hidden(club) }}<button>Vérifier les clés</button></form>
+    <form method="post" action="/admin/integrations/mailjet/test"><input type="hidden" name="csrf" value="{{ csrf }}">{{ hidden(club) }}<button>M'envoyer un email de test</button></form>
+    <form method="post" action="/admin/integrations/mailjet/delete" onsubmit="return confirm('Supprimer la configuration Mailjet ?')"><input type="hidden" name="csrf" value="{{ csrf }}">{{ hidden(club) }}<button class="danger">Supprimer</button></form>
+  </div>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>🎟️ HelloAsso — adhésions et paiements</h2>
+  <p class="muted">Dans HelloAsso : <em>Mon compte → Intégrations et API</em>, créez des identifiants API pour votre association. Ils servent à lire vos adhésions (<a href="/admin/memberships{{ '?club=' ~ club.id if user.is_super }}">page Adhésions</a>) et les paiements des sorties.</p>
+  <p>Statut : {% if integ and integ.helloasso_ready %}<span class="badge">✅ Configuré</span>{% else %}<span class="badge warn">Non configuré</span>{% endif %}</p>
+  <form method="post" action="/admin/integrations/helloasso">
+    <input type="hidden" name="csrf" value="{{ csrf }}">{{ hidden(club) }}
+    <label>Client ID <input name="client_id" required value="{{ integ.ha_client_id if integ and integ.ha_client_id else '' }}" autocomplete="off"></label>
+    <label>Client secret {% if integ and integ.ha_client_secret_enc %}<small class="muted">(enregistré — laisser vide pour le conserver)</small>{% endif %}
+      <input type="password" name="client_secret" autocomplete="new-password" placeholder="{{ '••••••••' if integ and integ.ha_client_secret_enc else '' }}"></label>
+    <label>Identifiant de l'organisation (slug) <input name="org_slug" required placeholder="mon-club-d-escalade" value="{{ integ.ha_org_slug if integ and integ.ha_org_slug else '' }}"></label>
+    <button>Enregistrer</button>
+  </form>
+  {% if integ and integ.helloasso_ready %}
+  <div class="actions" style="margin-top:.8rem">
+    <form method="post" action="/admin/integrations/helloasso/check"><input type="hidden" name="csrf" value="{{ csrf }}">{{ hidden(club) }}<button>Tester la connexion et lister les formulaires</button></form>
+    <form method="post" action="/admin/integrations/helloasso/delete" onsubmit="return confirm('Supprimer la configuration HelloAsso et les adhésions importées ?')"><input type="hidden" name="csrf" value="{{ csrf }}">{{ hidden(club) }}<button class="danger">Supprimer</button></form>
+  </div>
+  <h3>Adhésions</h3>
+  <form method="post" action="/admin/integrations/helloasso/membership">
+    <input type="hidden" name="csrf" value="{{ csrf }}">{{ hidden(club) }}
+    <label>Formulaire d'adhésion
+      {% if ha_forms is defined %}
+      <select name="form_slug"><option value="">— aucun —</option>
+        {% for f in ha_forms %}<option value="{{ f.slug }}" {{ 'selected' if integ.ha_membership_form == f.slug }}>{{ f.title }}</option>{% endfor %}
+      </select>
+      {% if not ha_forms %}<small class="muted">Aucun formulaire d'adhésion trouvé chez HelloAsso.</small>{% endif %}
+      {% else %}
+      <input name="form_slug" placeholder="slug du formulaire (ou testez la connexion pour le choisir dans la liste)" value="{{ integ.ha_membership_form or '' }}">
+      {% endif %}
+    </label>
+    <label>Une adhésion est « à jour » …
+      <select name="mode">
+        <option value="season" {{ 'selected' if integ.membership_mode == 'season' }}>pour la saison sportive en cours (depuis le 1er septembre)</option>
+        <option value="rolling" {{ 'selected' if integ.membership_mode == 'rolling' }}>pendant 12 mois à partir du paiement</option>
+      </select></label>
+    <button>Enregistrer</button>
+  </form>
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}

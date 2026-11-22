@@ -153,3 +153,92 @@ class Participation(Base):
 
     outing: Mapped[Outing] = relationship(back_populates="participations")
     user: Mapped[User] = relationship()
+
+
+# --- Emails, jetons, intégrations (tables ajoutées : create_all les crée sur une base existante) ---
+
+class ClubIntegration(Base):
+    """Réglages d'un club : Mailjet (envoi d'emails) et HelloAsso (adhésions, paiements)."""
+
+    __tablename__ = "club_integrations"
+
+    club_id: Mapped[int] = mapped_column(ForeignKey("clubs.id"), primary_key=True)
+    mj_api_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    mj_api_secret_enc: Mapped[str | None] = mapped_column(Text, nullable=True)  # chiffré
+    mj_from_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    mj_from_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    ha_client_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    ha_client_secret_enc: Mapped[str | None] = mapped_column(Text, nullable=True)  # chiffré
+    ha_org_slug: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    ha_membership_form: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    membership_mode: Mapped[str] = mapped_column(String(10), default="season")  # season | rolling
+    ha_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    @property
+    def mailjet_ready(self) -> bool:
+        return bool(self.mj_api_key and self.mj_api_secret_enc and self.mj_from_email)
+
+    @property
+    def helloasso_ready(self) -> bool:
+        return bool(self.ha_client_id and self.ha_client_secret_enc and self.ha_org_slug)
+
+
+class UserPref(Base):
+    __tablename__ = "user_prefs"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    notify_email: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Incrémenté à chaque changement de mot de passe : invalide les autres sessions
+    session_epoch: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class AuthToken(Base):
+    """Jeton à usage unique (mot de passe oublié, invitation). Seul le hash est stocké."""
+
+    __tablename__ = "auth_tokens"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    purpose: Mapped[str] = mapped_column(String(10))  # reset | invite
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Membership(Base):
+    """Adhésion importée depuis HelloAsso."""
+
+    __tablename__ = "memberships"
+    __table_args__ = (UniqueConstraint("club_id", "ha_item_id"), Index("ix_memberships_email", "club_id", "email"))
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    club_id: Mapped[int] = mapped_column(ForeignKey("clubs.id"))
+    ha_item_id: Mapped[str] = mapped_column(String(30))
+    email: Mapped[str] = mapped_column(String(255))
+    first_name: Mapped[str] = mapped_column(String(120), default="")
+    last_name: Mapped[str] = mapped_column(String(120), default="")
+    state: Mapped[str] = mapped_column(String(20))
+    amount_cents: Mapped[int] = mapped_column(Integer, default=0)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    @property
+    def full_name(self) -> str:
+        return f"{self.first_name} {self.last_name}".strip() or self.email
+
+
+class OutingForm(Base):
+    """Formulaire HelloAsso lié à une sortie (paiement)."""
+
+    __tablename__ = "outing_forms"
+
+    outing_id: Mapped[int] = mapped_column(ForeignKey("outings.id"), primary_key=True)
+    form_type: Mapped[str] = mapped_column(String(20))
+    form_slug: Mapped[str] = mapped_column(String(120))
+    form_title: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+
+class OutingReminder(Base):
+    __tablename__ = "outing_reminders"
+
+    outing_id: Mapped[int] = mapped_column(ForeignKey("outings.id"), primary_key=True)
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

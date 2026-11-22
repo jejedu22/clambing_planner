@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Nouveau mot de passe — Climbing Planner{% endblock %}
+{% block head %}<meta name="referrer" content="no-referrer">{% endblock %}
+{% block content %}
+<section class="card narrow">
+  {% if invalid %}
+    <h1>Lien invalide</h1>
+    <p>Ce lien est expiré, déjà utilisé ou incorrect.</p>
+    <p><a href="/forgot">Demander un nouveau lien</a></p>
+  {% else %}
+  <h1>{{ 'Activer mon compte' if purpose == 'invite' else 'Nouveau mot de passe' }}</h1>
+  <form method="post" action="/reset/{{ token }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Mot de passe (10 caractères minimum) <input type="password" name="new" required minlength="10" autocomplete="new-password" autofocus></label>
+    <label>Confirmation <input type="password" name="confirm" required minlength="10" autocomplete="new-password"></label>
+    <button>Enregistrer</button>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

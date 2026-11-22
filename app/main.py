@@ -1,4 +1,5 @@
 import logging
+import threading
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -11,9 +12,9 @@ from starlette.middleware.sessions import SessionMiddleware
 from .config import settings
 from .db import Base, SessionLocal, engine
 from .models import Role, User
-from .routes import admin, auth, dashboard, outings, pwa, sites
+from .routes import account, admin, auth, dashboard, integrations, outings, pwa, sites
 from .security import RedirectTo, hash_password, verify_csrf
-from .services import sites_import
+from .services import notifications, sites_import
 from .web import BASE, render
 
 log = logging.getLogger("app")
@@ -42,6 +43,7 @@ async def lifespan(app: FastAPI):
     bootstrap_superadmin()
     if settings.env != "test":
         sites_import.start_refresher()
+        threading.Thread(target=notifications.reminder_loop, name="reminders", daemon=True).start()
     yield
 
 
@@ -61,7 +63,7 @@ app.add_middleware(
 )
 app.mount("/static", StaticFiles(directory=BASE / "static"), name="static")
 
-for module in (pwa, auth, dashboard, sites, outings, admin):
+for module in (pwa, auth, account, dashboard, sites, outings, admin, integrations):
     app.include_router(module.router)
 
 

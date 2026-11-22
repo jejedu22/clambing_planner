@@ -1,14 +1,15 @@
 from datetime import date, time
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
 from ..db import get_db
-from ..models import Club, Outing, Participation, Site, User
+from ..models import Club, ClubIntegration, Outing, OutingForm, OutingReminder, Participation, Site, User
 from ..security import admin_required, can_access_club, login_required
-from ..services import weather
+from ..services import memberships, notifications, weather
+from ..services.helloasso import FORM_TYPES, SLUG_RE, HelloAssoError, Item
 from ..web import flash, render
 from .dashboard import today
 
@@ -78,7 +79,7 @@ def outing_new(request: Request, site: int | None = None,
 
 
 @router.post("/outings/new")
-def outing_create(request: Request, club_id: str = Form(""), site_id: str = Form(""),
+def outing_create(request: Request, background: BackgroundTasks, club_id: str = Form(""), site_id: str = Form(""),
                   title: str = Form(""), day: str = Form(""), meeting_time: str = Form(""),
                   meeting_point: str = Form(""), description: str = Form(""),
                   max_participants: str = Form(""),
@@ -95,6 +96,7 @@ def outing_create(request: Request, club_id: str = Form(""), site_id: str = Form
     outing = Outing(**values, created_by=user.id)
     db.add(outing)
     db.commit()
+    background.add_task(notifications.outing_created, outing.id, user.id)
     flash(request, "Sortie créée.", "ok")
     return RedirectResponse(f"/outings/{outing.id}", status_code=303)
 
@@ -112,7 +114,8 @@ def outing_detail(outing_id: int, request: Request, user: User = Depends(login_r
     return render(request, "outing_detail.html", outing=outing, groups=groups, mine=mine,
                   statuses=STATUSES, seats=sum(p.seats for p in groups["yes"]),
                   forecast=weather.forecast_for_day(outing.site.lat, outing.site.lon, outing.day),
-                  can_edit=user.is_super or (user.is_admin and user.club_id == outing.club_id))
+                  can_edit=user.is_super or (user.is_admin and user.club_id == outing.club_id),
+                  ha_ready=bool((i := db.get(ClubIntegration, outing.club_id)) and i.helloasso_ready))
 
 
 @router.post("/outings/{outing_id}/respond")
@@ -159,7 +162,7 @@ def outing_edit(outing_id: int, request: Request, user: User = Depends(login_req
 
 
 @router.post("/outings/{outing_id}/edit")
-def outing_update(outing_id: int, request: Request, club_id: str = Form(""),
+def outing_update(outing_id: int, request: Request, background: BackgroundTasks, club_id: str = Form(""),
                   site_id: str = Form(""), title: str = Form(""), day: str = Form(""),
                   meeting_time: str = Form(""), meeting_point: str = Form(""),
                   description: str = Form(""), max_participants: str = Form(""),
@@ -171,19 +174,26 @@ def outing_update(outing_id: int, request: Request, club_id: str = Form(""),
         clubs = db.scalars(select(Club).order_by(Club.name)).all() if user.is_super else []
         return render(request, "outing_form.html", 400, outing=outing, clubs=clubs,
                       site=outing.site, error=error)
+    before = (outing.day, outing.meeting_time, outing.site_id, outing.meeting_point)
     for key, value in values.items():
         setattr(outing, key, value)
+    changes = [label for label, old, new in (
+        ("date", before[0], outing.day), ("heure", before[1], outing.meeting_time),
+        ("site", before[2], outing.site_id), ("lieu de rendez-vous", before[3], outing.meeting_point)) if old != new]
     db.commit()
+    if changes:
+        background.add_task(notifications.outing_changed, outing.id, user.id, changes)
     flash(request, "Sortie modifiée.", "ok")
     return RedirectResponse(f"/outings/{outing.id}", status_code=303)
 
 
 @router.post("/outings/{outing_id}/cancel")
-def outing_cancel(outing_id: int, request: Request, user: User = Depends(login_required),
+def outing_cancel(outing_id: int, request: Request, background: BackgroundTasks, user: User = Depends(login_required),
                   db: Session = Depends(get_db)):
     outing = _editable(db, user, outing_id)
     outing.cancelled = not outing.cancelled
     db.commit()
+    background.add_task(notifications.outing_cancelled, outing.id, user.id, outing.cancelled)
     flash(request, "Sortie annulée." if outing.cancelled else "Sortie rétablie.", "ok")
     return RedirectResponse(f"/outings/{outing.id}", status_code=303)
 
@@ -192,7 +202,96 @@ def outing_cancel(outing_id: int, request: Request, user: User = Depends(login_r
 def outing_delete(outing_id: int, request: Request, user: User = Depends(login_required),
                   db: Session = Depends(get_db)):
     outing = _editable(db, user, outing_id)
+    for model in (OutingForm, OutingReminder):
+        row = db.get(model, outing.id)
+        if row:
+            db.delete(row)
     db.delete(outing)
     db.commit()
     flash(request, "Sortie supprimée.", "ok")
     return RedirectResponse("/outings", status_code=303)
+
+
+# --- Paiements HelloAsso d'une sortie ---------------------------------------
+
+_items_cache: dict[tuple, tuple[float, list[Item]]] = {}
+CACHE_TTL = 60
+
+
+def _paying_items(integ: ClubIntegration, link: OutingForm, refresh: bool) -> list[Item]:
+    import time
+    key = (integ.club_id, link.form_type, link.form_slug)
+    hit = _items_cache.get(key)
+    if hit and not refresh and time.time() - hit[0] < CACHE_TTL:
+        return hit[1]
+    items = memberships.client_for(integ).items(integ.ha_org_slug, link.form_type, link.form_slug)
+    _items_cache[key] = (time.time(), items)
+    return items
+
+
+def _payments_outing(db: Session, user: User, outing_id: int) -> tuple[Outing, ClubIntegration]:
+    outing = _editable(db, user, outing_id)
+    integ = db.get(ClubIntegration, outing.club_id)
+    if integ is None or not integ.helloasso_ready:
+        raise HTTPException(404, "HelloAsso n'est pas configuré pour ce club.")
+    return outing, integ
+
+
+@router.get("/outings/{outing_id}/payments")
+def outing_payments(outing_id: int, request: Request, refresh: int = 0, user: User = Depends(login_required),
+                    db: Session = Depends(get_db)):
+    outing, integ = _payments_outing(db, user, outing_id)
+    link = db.get(OutingForm, outing.id)
+    ctx: dict = dict(outing=outing, link=link, forms=None, rows=[], unmatched=[], error=None)
+    try:
+        if link is None:
+            ctx["forms"] = [f for f in memberships.client_for(integ).forms(integ.ha_org_slug)
+                            if f["type"] != "Membership"]
+        else:
+            paid: dict[str, dict] = {}
+            for it in _paying_items(integ, link, bool(refresh)):
+                if it.valid and it.email:
+                    p = paid.setdefault(it.email, {"cents": 0, "name": f"{it.first_name} {it.last_name}".strip()})
+                    p["cents"] += it.amount_cents
+            parts = db.scalars(select(Participation).options(joinedload(Participation.user)).where(
+                Participation.outing_id == outing.id, Participation.status == "yes")).all()
+            emails = {p.user.email for p in parts}
+            ctx["rows"] = sorted(((p.user, paid.get(p.user.email)) for p in parts), key=lambda r: r[0].name.lower())
+            club_emails = {u.email for u in db.scalars(select(User).where(User.club_id == outing.club_id))}
+            ctx["unmatched"] = [(e, v) for e, v in paid.items() if e not in emails and e not in club_emails]
+    except HelloAssoError as exc:
+        ctx["error"] = str(exc)
+    return render(request, "outing_payments.html", **ctx)
+
+
+@router.post("/outings/{outing_id}/payments/link")
+def outing_payments_link(outing_id: int, request: Request, form: str = Form(...),
+                         user: User = Depends(login_required), db: Session = Depends(get_db)):
+    outing, integ = _payments_outing(db, user, outing_id)
+    ftype, _, slug = form.partition("|")
+    if ftype not in FORM_TYPES or ftype == "Membership" or not SLUG_RE.match(slug):
+        raise HTTPException(400, "Formulaire invalide.")
+    try:   # le formulaire doit exister chez HelloAsso pour cette organisation
+        match = next((f for f in memberships.client_for(integ).forms(integ.ha_org_slug)
+                      if f["type"] == ftype and f["slug"] == slug), None)
+    except HelloAssoError as exc:
+        flash(request, str(exc), "error")
+        return RedirectResponse(f"/outings/{outing.id}/payments", status_code=303)
+    if match is None:
+        raise HTTPException(400, "Formulaire introuvable chez HelloAsso.")
+    db.merge(OutingForm(outing_id=outing.id, form_type=ftype, form_slug=slug, form_title=(match["title"] or "")[:255]))
+    db.commit()
+    flash(request, "Formulaire HelloAsso lié à la sortie.", "ok")
+    return RedirectResponse(f"/outings/{outing.id}/payments", status_code=303)
+
+
+@router.post("/outings/{outing_id}/payments/unlink")
+def outing_payments_unlink(outing_id: int, request: Request, user: User = Depends(login_required),
+                           db: Session = Depends(get_db)):
+    outing, _ = _payments_outing(db, user, outing_id)
+    link = db.get(OutingForm, outing.id)
+    if link:
+        db.delete(link)
+        db.commit()
+    flash(request, "Formulaire délié.", "ok")
+    return RedirectResponse(f"/outings/{outing.id}/payments", status_code=303)

@@ -14,6 +14,8 @@ services:
       SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-}
       SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:-}
       SITES_REFRESH_DAYS: ${SITES_REFRESH_DAYS:-30}
+      # Base des liens dans les emails (mot de passe oublié, invitations, notifications)
+      APP_BASE_URL: https://${APP_HOST:?}
     networks:
       - proxy      # exposé via Traefik
       - internal   # accès à la base

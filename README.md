@@ -33,6 +33,25 @@ L'application est servie sur `https://$APP_HOST` (routeur `climbing`, entrypoint
 
 Sauvegarde : volume Docker `pgdata` (`docker compose exec db pg_dump -U climbing climbing > backup.sql`).
 
+## Emails (Mailjet) et HelloAsso
+
+Chaque club configure **ses propres** identifiants dans **Intégrations** (réservé à l'administrateur du club et au super administrateur). Les clés sont chiffrées en base et ne sont jamais réaffichées ; chiffrement dérivé de `SECRET_KEY` : si vous la changez, les clés enregistrées deviennent illisibles et doivent être ressaisies.
+
+**Mailjet** : clé API + clé secrète + adresse d'expéditeur **validée chez Mailjet**. Boutons « Vérifier les clés » (mode bac à sable, rien n'est envoyé) et « M'envoyer un email de test ».
+Emails envoyés :
+- *mot de passe oublié* (lien valable 1 h, à usage unique, même réponse que le compte existe ou non, limité à 3 demandes/heure par adresse) ;
+- *invitation* d'un nouvel utilisateur (lien valable 7 jours) à la place d'un mot de passe provisoire ;
+- *notifications de sorties* : nouvelle sortie (tout le club), modification / annulation (inscrits « oui » ou « peut-être »), rappel la veille avec la météo. Chaque membre peut les couper dans « Mon compte » ;
+- les changements de mot de passe ferment les sessions ouvertes sur les autres appareils.
+
+Sans Mailjet configuré pour un club, rien n'est envoyé : l'administrateur transmet un mot de passe provisoire comme avant. Le **super administrateur** n'a pas de club donc pas d'email : `docker compose exec app python -m app.cli reset-password EMAIL`.
+Variable obligatoire pour les liens : `APP_BASE_URL` (déduite de `APP_HOST` par le compose, jamais de l'en-tête `Host`).
+
+**HelloAsso** : identifiants API de l'association (client ID / secret, lecture seule) + slug de l'organisation. Le client doit avoir les privilèges `AccessPublicData` et `AccessTransactions`.
+- **Adhésions → membres** (page *Adhésions*) : synchronisation du formulaire d'adhésion, statut « à jour » (saison sportive depuis le 1er septembre, ou 12 mois glissants), création des comptes et invitation par email. La cotisation apparaît aussi dans *Utilisateurs*.
+- **Paiement des sorties** : sur une sortie, *Paiements HelloAsso* lie un formulaire (billetterie, événement, boutique…) et montre qui a payé parmi les inscrits.
+- L'email vient du **payeur** HelloAsso (un parent peut payer pour son enfant) : le rapprochement se fait par email.
+
 ## Application installable (PWA)
 
 L'appli s'installe sur l'écran d'accueil : Chrome/Edge/Android proposent « Installer », sur iPhone via *Partager → Sur l'écran d'accueil*. Elle exige HTTPS, ce que Traefik fournit.

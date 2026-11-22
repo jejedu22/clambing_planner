@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Paiements — {{ outing.title }}{% endblock %}
+{% block content %}
+<p><a href="/outings/{{ outing.id }}">← {{ outing.title }}</a></p>
+<h1>Paiements HelloAsso</h1>
+{% if error %}<div class="flash error">{{ error }}</div>{% endif %}
+{% if not link %}
+  <p>Choisissez le formulaire HelloAsso (billetterie, événement, boutique, paiement…) à lier à cette sortie.</p>
+  {% if forms is not none %}
+  <form method="post" action="/outings/{{ outing.id }}/payments/link" class="card">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Formulaire
+      <select name="form" required>
+        {% for f in forms %}<option value="{{ f.type }}|{{ f.slug }}">{{ f.title }} ({{ f.type }})</option>{% endfor %}
+      </select></label>
+    {% if forms %}<button>Lier</button>{% else %}<p class="muted">Aucun formulaire de paiement trouvé chez HelloAsso.</p>{% endif %}
+  </form>
+  {% endif %}
+{% else %}
+  <p>Formulaire lié : <strong>{{ link.form_title or link.form_slug }}</strong> <span class="tag">{{ link.form_type }}</span></p>
+  <div class="actions">
+    <a class="btn" href="/outings/{{ outing.id }}/payments?refresh=1">🔄 Actualiser</a>
+    <form method="post" action="/outings/{{ outing.id }}/payments/unlink"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Délier</button></form>
+  </div>
+  {% if not error %}
+  <h2>Participants inscrits</h2>
+  <table>
+    <tr><th>Participant</th><th>Email</th><th>Paiement</th></tr>
+    {% for u, p in rows %}
+    <tr><td>{{ u.name }}</td><td>{{ u.email }}</td>
+      <td>{% if p %}<span class="badge">✅ {{ '%.2f' | format(p.cents / 100) }} €</span>{% else %}<span class="badge warn">Non payé</span>{% endif %}</td></tr>
+    {% else %}<tr><td colspan="3" class="muted">Personne n'est encore inscrit.</td></tr>{% endfor %}
+  </table>
+  <p class="muted">Le rapprochement se fait par email : celui du compte doit être celui du payeur HelloAsso.</p>
+  {% if unmatched %}
+  <h2>Paiements non rattachés</h2>
+  <table><tr><th>Payeur</th><th>Email</th><th>Montant</th></tr>
+    {% for e, v in unmatched %}<tr><td>{{ v.name or '—' }}</td><td>{{ e }}</td><td>{{ '%.2f' | format(v.cents / 100) }} €</td></tr>{% endfor %}
+  </table>
+  {% endif %}
+  {% endif %}
+{% endif %}
+{% endblock %}

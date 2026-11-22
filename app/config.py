@@ -29,6 +29,11 @@ class Settings:
         self.weather_url = os.environ.get("WEATHER_URL", "https://api.open-meteo.com/v1/forecast")
         self.timezone = os.environ.get("TZ", "Europe/Paris")
         self.user_agent = "climbing-planner/1.0"
+        # URL publique de l'application, utilisée dans les liens des emails.
+        # Volontairement jamais déduite de l'en-tête Host (risque d'empoisonnement des liens).
+        self.app_base_url = os.environ.get("APP_BASE_URL", "").rstrip("/")
+        self.mailjet_url = os.environ.get("MAILJET_API_URL", "https://api.mailjet.com")
+        self.helloasso_url = os.environ.get("HELLOASSO_API_URL", "https://api.helloasso.com")
 
 
 settings = Settings()

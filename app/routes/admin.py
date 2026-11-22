@@ -5,11 +5,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..models import ROLE_LABELS, Club, Outing, Role, Site, SiteImport, User
+from ..models import ROLE_LABELS, Club, ClubIntegration, Outing, Role, Site, SiteImport, User
 from ..security import (
     admin_required, generate_password, hash_password, password_error, super_required,
 )
-from ..services import sites_import
+from ..services import memberships, notifications, sites_import, tokens, mailer
+from .dashboard import today
 from ..web import flash, render
 
 router = APIRouter(prefix="/admin")
@@ -80,8 +81,13 @@ def _users_context(db: Session, actor: User, **extra):
     names = {c.id: c.name for c in db.scalars(select(Club))}
     roles = ROLE_LABELS if actor.is_super else {k: v for k, v in ROLE_LABELS.items()
                                                 if k != Role.SUPER_ADMIN.value}
-    return dict(users=users, clubs=clubs, club_names=names, roles=roles,
-                manageable={u.id: _manageable(actor, u) for u in users}, **extra)
+    dues: dict[str, bool] = {}
+    for cid in {u.club_id for u in users if u.club_id}:
+        if db.get(ClubIntegration, cid) and db.get(ClubIntegration, cid).ha_membership_form:
+            dues.update({e: ok for e, (_, ok) in memberships.status_by_email(db, cid, today()).items()})
+    return dict(users=users, clubs=clubs, club_names=names, roles=roles, dues=dues,
+                manageable={u.id: _manageable(actor, u) for u in users},
+                mail_ok=bool(actor.club_id and mailer.load_config(db, actor.club_id)), **extra)
 
 
 @router.get("/users")
@@ -92,7 +98,7 @@ def users_page(request: Request, user: User = Depends(admin_required), db: Sessi
 @router.post("/users")
 def user_create(request: Request, name: str = Form(...), email: str = Form(...),
                 role: str = Form(Role.MEMBER.value), club_id: str = Form(""),
-                password: str = Form(""), user: User = Depends(admin_required),
+                password: str = Form(""), invite: str = Form(""), user: User = Depends(admin_required),
                 db: Session = Depends(get_db)):
     email = email.strip().lower()
     name = name.strip()[:120]
@@ -118,9 +124,21 @@ def user_create(request: Request, name: str = Form(...), email: str = Form(...),
         error = "Cet email est déjà utilisé."
     if error:
         return render(request, "admin_users.html", 400, error=error, **_users_context(db, user))
-    db.add(User(email=email, name=name, role=role, club_id=target_club,
-                password_hash=hash_password(temp), must_change_password=True))
+    new_user = User(email=email, name=name, role=role, club_id=target_club,
+                    password_hash=hash_password(temp), must_change_password=True)
+    db.add(new_user)
     db.commit()
+    if invite == "1" and not password and target_club and mailer.load_config(db, target_club):
+        new_user.must_change_password = False   # la personne choisit son mot de passe via le lien
+        db.commit()
+        ok, err = notifications.send_invite(db, new_user)
+        if ok:
+            return render(request, "admin_users.html", **_users_context(db, user, invited=email))
+        # échec d'envoi : on retombe sur le mot de passe provisoire à transmettre à la main
+        new_user.must_change_password = True
+        db.commit()
+        return render(request, "admin_users.html", **_users_context(
+            db, user, credentials=dict(email=email, password=temp), invite_error=err))
     return render(request, "admin_users.html", **_users_context(
         db, user, credentials=dict(email=email, password=temp)))
 
@@ -154,6 +172,7 @@ def user_reset(user_id: int, request: Request, user: User = Depends(admin_requir
     temp = generate_password()
     target.password_hash = hash_password(temp)
     target.must_change_password = True
+    tokens.bump_epoch(db, target.id)   # déconnecte ses sessions ouvertes
     db.commit()
     return render(request, "admin_users.html", **_users_context(
         db, user, credentials=dict(email=target.email, password=temp)))

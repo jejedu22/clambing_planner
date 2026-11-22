@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Hors connexion — Climbing Planner{% endblock %}
+{% block content %}
+<section class="card narrow">
+  <h1>📡 Hors connexion</h1>
+  <p>Impossible de joindre le serveur. Les sorties et la météo nécessitent une connexion : vérifiez votre réseau, puis réessayez.</p>
+  <p><button onclick="location.reload()">Réessayer</button></p>
+</section>
+{% endblock %}

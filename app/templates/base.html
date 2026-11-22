@@ -4,6 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Climbing Planner{% endblock %}</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#c2540a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Climbing">
+  <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
   <link rel="stylesheet" href="/static/style.css">
   {% block head %}{% endblock %}
 </head>
@@ -33,5 +40,6 @@
   Sites : © contributeurs <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> (ODbL) ·
   Météo : <a href="https://open-meteo.com/">Open-Meteo</a>
 </footer>
+<script src="/static/pwa.js"></script>
 </body>
 </html>

@@ -231,3 +231,33 @@ def test_xss_is_escaped(world, db):
                                  "csrf": csrf(c, "/outings/new")})
     oid = db.query(Outing).one().id
     assert "<script>alert(1)</script>" not in c.get(f"/outings/{oid}").text
+
+
+# --- PWA ----------------------------------------------------------------------
+
+def test_pwa_files_are_public_and_valid(world):
+    c = TestClient(app)
+    m = c.get("/manifest.webmanifest")
+    assert m.status_code == 200 and m.headers["content-type"].startswith("application/manifest+json")
+    data = m.json()
+    assert data["display"] == "standalone" and data["start_url"] == "/"
+    sizes = {i["sizes"] for i in data["icons"]}
+    assert {"192x192", "512x512"} <= sizes and any(i["purpose"] == "maskable" for i in data["icons"])
+    for icon in data["icons"]:                       # toutes les icônes déclarées existent
+        assert c.get(icon["src"]).status_code == 200
+    sw = c.get("/sw.js")
+    assert sw.status_code == 200 and "javascript" in sw.headers["content-type"]
+    assert sw.headers["service-worker-allowed"] == "/" and sw.headers["cache-control"] == "no-cache"
+    assert "__VERSION__" not in sw.text
+    off = c.get("/offline")
+    assert off.status_code == 200 and "Hors connexion" in off.text
+    assert 'rel="manifest"' in c.get("/login").text and "/static/pwa.js" in c.get("/login").text
+
+
+def test_sw_precache_assets_exist(world):
+    import re
+    c = TestClient(app)
+    sw = c.get("/sw.js").text
+    block = re.search(r"PRECACHE = \[(.*?)\];", sw, re.S).group(1)
+    for path in re.findall(r"'(/[^']+)'", block):
+        assert c.get(path).status_code == 200, path

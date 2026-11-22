@@ -129,7 +129,7 @@ def test_no_reset_link_without_base_url(world, db, smtp_outbox, monkeypatch):
 
 def test_invite_by_email_and_fallback(world, db, outbox):
     admin = client_for("admin_a@test.org")
-    form = lambda e: {"name": "Neo", "email": e, "role": "member", "invite": "1", "csrf": csrf(admin, "/admin/users")}
+    form = lambda e: {"first_name": "Neo", "last_name": "Test", "email": e, "role": "member", "invite": "1", "csrf": csrf(admin, "/admin/users")}
     r = admin.post("/admin/users", data=form("neo@test.org"))          # pas de Mailjet : mot de passe provisoire
     assert "Mot de passe provisoire" in r.text and outbox == []
     enable_mailjet(db, world["a"].id)
@@ -145,7 +145,7 @@ def test_invite_failure_falls_back_to_temp_password(world, db, monkeypatch):
     enable_mailjet(db, world["a"].id)
     monkeypatch.setattr(mailer, "_post", lambda *a: (401, {}))
     admin = client_for("admin_a@test.org")
-    r = admin.post("/admin/users", data={"name": "Neo", "email": "neo@test.org", "role": "member",
+    r = admin.post("/admin/users", data={"first_name": "Neo", "last_name": "Test", "email": "neo@test.org", "role": "member",
                                          "invite": "1", "csrf": csrf(admin, "/admin/users")})
     assert "n'a pas pu être envoyée" in r.text and "Mot de passe provisoire" in r.text
     assert db.query(User).filter_by(email="neo@test.org").one().must_change_password

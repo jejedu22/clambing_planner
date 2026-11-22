@@ -170,6 +170,18 @@ def send_invite(db: Session, user: User) -> tuple[bool, str | None]:
     return sent == 1, err
 
 
+def invite_many(user_ids: list[int]) -> None:
+    """Invitations envoyées en arrière-plan (import en masse). Les échecs sont journalisés."""
+    with SessionLocal() as db:
+        for uid in user_ids:
+            user = db.get(User, uid)
+            if user is None:
+                continue
+            ok, err = send_invite(db, user)
+            if not ok:
+                audit("user.invite_failed", target=f"user:{uid}", club_id=user.club_id, detail=err)
+
+
 def reminder_loop() -> None:
     import time
     time.sleep(30)

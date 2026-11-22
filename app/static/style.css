@@ -45,3 +45,7 @@ td select{margin:0}tr.cancelled td{opacity:.55}
 .verdict{font-weight:600;color:var(--ok)}.verdict.warn{color:var(--warn)}.verdict.bad{color:var(--bad)}
 .pager{text-align:center}code{background:var(--bg);padding:0 .3rem;border-radius:4px}
 @media (max-width:640px){table{display:block;overflow-x:auto}}
+
+.two-cols{display:grid;grid-template-columns:1fr 1fr;gap:.8rem}@media (max-width:640px){.two-cols{grid-template-columns:1fr}}
+textarea[hidden]{display:none}
+.nowrap{white-space:nowrap}

@@ -7,6 +7,7 @@ from sqlalchemy import (
     Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, Time,
     UniqueConstraint, Index,
 )
+from sqlalchemy import event
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -45,7 +46,11 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(String(255), unique=True)
+    # `name` = nom d'affichage, maintenu automatiquement à partir de first_name + last_name
     name: Mapped[str] = mapped_column(String(120))
+    first_name: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    last_name: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(32), nullable=True)  # format international normalisé
     password_hash: Mapped[str] = mapped_column(String(100))
     role: Mapped[str] = mapped_column(String(20), default=Role.MEMBER.value)
     # Un super administrateur n'appartient à aucun club
@@ -67,6 +72,21 @@ class User(Base):
     @property
     def role_label(self) -> str:
         return ROLE_LABELS.get(self.role, self.role)
+
+
+def split_name(full: str) -> tuple[str, str]:
+    """Découpe « Prénom Nom » (premier mot = prénom) pour les comptes créés sans prénom/nom séparés."""
+    parts = (full or "").split(None, 1)
+    return (parts[0], parts[1] if len(parts) > 1 else "") if parts else ("", "")
+
+
+@event.listens_for(User, "before_insert")
+@event.listens_for(User, "before_update")
+def _sync_display_name(mapper, connection, user: User) -> None:
+    if user.first_name or user.last_name:
+        user.name = f"{user.first_name or ''} {user.last_name or ''}".strip()
+    elif user.name:
+        user.first_name, user.last_name = split_name(user.name)
 
 
 TYPE_LABELS = {

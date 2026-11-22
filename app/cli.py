@@ -8,6 +8,7 @@ import sys
 from sqlalchemy import select
 
 from .db import Base, SessionLocal, engine
+from .migrations import upgrade_schema
 from .models import User
 from .security import generate_password, hash_password
 from .services import tokens
@@ -15,6 +16,7 @@ from .services import tokens
 
 def reset_password(email: str) -> int:
     Base.metadata.create_all(engine)
+    upgrade_schema(engine)
     with SessionLocal() as db:
         user = db.scalar(select(User).where(User.email == email.strip().lower()))
         if user is None:

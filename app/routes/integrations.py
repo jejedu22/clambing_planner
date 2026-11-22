@@ -267,7 +267,8 @@ def memberships_invite(request: Request, club_id: int | None = Form(None), email
             continue
         m = status[addr][0]
         temp = generate_password()
-        member = User(email=addr, name=m.full_name[:120], role=Role.MEMBER.value, club_id=club.id,
+        member = User(email=addr, first_name=m.first_name[:55] or None, last_name=m.last_name[:55] or None,
+                      name=m.full_name[:120], role=Role.MEMBER.value, club_id=club.id,
                       password_hash=hash_password(temp), must_change_password=not mail_ok)
         db.add(member)
         db.commit()

@@ -167,7 +167,7 @@ def test_audit_login_and_password_events(world, db):
 
 def test_audit_admin_actions_and_secrets(world, db):
     admin = client_for("admin_a@test.org")
-    admin.post("/admin/users", data={"name": "Neo", "email": "neo@test.org", "role": "member", "csrf": csrf(admin, "/admin/users")})
+    admin.post("/admin/users", data={"first_name": "Neo", "last_name": "Test", "email": "neo@test.org", "role": "member", "csrf": csrf(admin, "/admin/users")})
     admin.post("/admin/integrations/mailjet", data={"api_key": "abcd1234abcd", "api_secret": "supersecretvalue",
                "from_email": "club@test.org", "csrf": csrf(admin, "/admin/integrations")})
     ev = events(db); flat = json.dumps(ev)

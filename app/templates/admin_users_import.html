@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Importer des utilisateurs — Climbing Planner{% endblock %}
+{% block content %}
+<p><a href="/admin/users">← Utilisateurs</a></p>
+<h1>Importer des utilisateurs</h1>
+
+{% if result %}
+  <div class="flash ok"><strong>Import terminé</strong> — {{ result.created }} créé(s), {{ result.updated }} modifié(s),
+    {{ result.skipped }} inchangé(s){% if result.errors %}, {{ result.errors }} ligne(s) ignorée(s) pour erreur{% endif %}.
+    {% if result.invited %}<br>Les invitations partent par email en arrière-plan. En cas d'échec, utilisez « Réinit. mot de passe » dans la liste.{% endif %}</div>
+  {% if credentials %}
+  <div class="flash ok"><strong>Mots de passe provisoires (affichés une seule fois)</strong>
+    <table><tr><th>Nom</th><th>Email</th><th>Mot de passe</th></tr>
+    {% for c in credentials %}<tr><td>{{ c.name }}</td><td>{{ c.email }}</td><td><code>{{ c.password }}</code></td></tr>{% endfor %}</table>
+    <small>Chaque personne devra le changer à sa première connexion.</small></div>
+  {% endif %}
+  <p><a class="btn" href="/admin/users">Retour aux utilisateurs</a></p>
+
+{% elif plan is defined %}
+  <p>Club : <strong>{{ club.name }}</strong> — simulation, <strong>rien n'est encore enregistré</strong>.</p>
+  <p>
+    <span class="badge">➕ {{ counts.create }} à créer</span>
+    <span class="badge warn">✏️ {{ counts['update'] }} à modifier</span>
+    <span class="badge">= {{ counts.skip }} inchangé(s)</span>
+    <span class="badge bad">⚠️ {{ counts.error }} erreur(s)</span>
+  </p>
+  {% if counts.error %}<p class="muted">Les lignes en erreur seront ignorées ; corrigez le fichier et réimportez-les si besoin.</p>{% endif %}
+  <div class="table-wrap"><table>
+    <tr><th>Ligne</th><th>Action</th><th>Prénom</th><th>Nom</th><th>Email</th><th>Téléphone</th><th>Rôle</th><th>Remarque</th></tr>
+    {% for r in plan %}
+    <tr class="{{ 'cancelled' if r.action in ('skip', 'error') }}">
+      <td>{{ r.line }}</td>
+      <td>{{ {'create': '➕ Créer', 'update': '✏️ Modifier', 'skip': '= Inchangé', 'error': '⚠️ Erreur'}[r.action] }}</td>
+      <td>{{ r.first_name }}</td><td>{{ r.last_name }}</td><td>{{ r.email }}</td><td class="nowrap">{{ r.phone | phone }}</td>
+      <td>{{ r.role if r.action == 'create' else '' }}</td><td>{{ r.message }}</td>
+    </tr>
+    {% endfor %}
+  </table></div>
+  {% if counts.create or counts['update'] %}
+  <form method="post" action="/admin/users/import" class="card">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="step" value="confirm">
+    <input type="hidden" name="club_id" value="{{ club.id }}">
+    <input type="hidden" name="invite" value="{{ '1' if invite }}">
+    <textarea name="csv_text" hidden>{{ csv_text }}</textarea>
+    {% if counts.create %}<p>{% if invite %}Les {{ counts.create }} nouveau(x) compte(s) recevront une <strong>invitation par email</strong>.{% else %}Les {{ counts.create }} nouveau(x) compte(s) auront un <strong>mot de passe provisoire</strong>, affiché une seule fois.{% endif %}</p>{% endif %}
+    <button>Confirmer l'import</button> <a href="/admin/users/import">Annuler</a>
+  </form>
+  {% else %}<p><a class="btn" href="/admin/users/import">Recommencer</a></p>{% endif %}
+
+{% else %}
+  <form method="post" action="/admin/users/import" enctype="multipart/form-data" class="card">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="step" value="preview">
+    {% if clubs %}
+    <label>Club <select name="club_id" required><option value="">—</option>
+      {% for c in clubs %}<option value="{{ c.id }}" {{ 'selected' if club and club.id == c.id }}>{{ c.name }}</option>{% endfor %}</select></label>
+    {% endif %}
+    <label>Fichier CSV <input type="file" name="file" accept=".csv,text/csv,text/plain" required></label>
+    {% if mail_ok or user.is_super %}<label class="inline"><input type="checkbox" name="invite" value="1" checked> Inviter les nouveaux comptes par email (si Mailjet est configuré pour le club)</label>{% endif %}
+    <p><button>Vérifier le fichier</button></p>
+  </form>
+  <div class="card">
+    <h3>Format du fichier</h3>
+    <ul>
+      <li>Colonnes <code>prenom</code>, <code>nom</code>, <code>email</code> (obligatoires : email et au moins un prénom ou un nom), <code>telephone</code> et <code>role</code> (<code>member</code> ou <code>club_admin</code>) facultatives.</li>
+      <li>Séparateur <code>;</code>, <code>,</code> ou tabulation ; encodage UTF-8 ou Excel (Windows). 2 000 lignes et 500 Ko maximum.</li>
+      <li>Un email déjà présent dans le club est <strong>mis à jour</strong> (prénom, nom, téléphone ; une cellule vide n'efface rien, le rôle n'est jamais modifié). Un email d'un autre club est refusé.</li>
+      <li>Vous pouvez réimporter un fichier produit par l'export (les colonnes inconnues sont ignorées).</li>
+    </ul>
+    <p><a class="btn" href="/admin/users/import/template">Télécharger un modèle</a></p>
+  </div>
+{% endif %}
+{% endblock %}

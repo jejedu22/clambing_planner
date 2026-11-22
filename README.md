@@ -33,6 +33,13 @@ L'application est servie sur `https://$APP_HOST` (routeur `climbing`, entrypoint
 
 Sauvegarde : volume Docker `pgdata` (`docker compose exec db pg_dump -U climbing climbing > backup.sql`).
 
+## Gestion des utilisateurs
+
+- **Fiche** : prénom, nom, email (identifiant de connexion), téléphone (facultatif, normalisé au format international : `06 12 34 56 78` devient `+33612345678`), rôle, actif. Chacun modifie son prénom/nom/téléphone dans *Mon compte* ; l'email et le rôle ne se changent que par un administrateur (qui invalide alors les liens de réinitialisation en attente). Liste avec recherche (nom, email, téléphone) et pagination.
+- **Export CSV** (*Utilisateurs → Exporter*) : séparateur `;` et UTF-8 avec BOM (s'ouvre directement dans Excel), colonnes `prenom;nom;email;telephone;role;club;actif;cotisation`. Un administrateur de club n'exporte que son club ; les cellules commençant par `=`, `+`, `-`, `@` sont neutralisées contre l'injection de formules. L'export est tracé dans le journal d'audit (données personnelles).
+- **Import CSV** (*Utilisateurs → Importer*) en deux temps : une **simulation** (créations, modifications, inchangés, erreurs ligne par ligne) puis une confirmation, qui revalide tout côté serveur. Colonnes `prenom;nom;email` (+ `telephone`, `role` facultatives), séparateur `;` `,` ou tabulation, UTF-8 ou Excel Windows, 2 000 lignes / 500 Ko maximum. Un email déjà présent dans le club est **mis à jour** (une cellule vide n'efface rien, le rôle n'est jamais modifié) ; un email d'un autre club ou d'un super administrateur est refusé ; un import ne crée jamais de super administrateur. Les nouveaux comptes reçoivent une invitation par email (si Mailjet est configuré) ou un mot de passe provisoire affiché une seule fois. Un modèle est téléchargeable, et un fichier d'export peut être réimporté tel quel.
+- **Migration automatique** : au démarrage, les colonnes ajoutées (prénom, nom, téléphone) sont créées sur une base existante, et le prénom/nom des comptes existants sont déduits de leur nom (premier mot = prénom) : à vérifier si des noms sont composés.
+
 ## Emails (Mailjet) et HelloAsso
 
 Chaque club configure **ses propres** identifiants dans **Intégrations** (réservé à l'administrateur du club et au super administrateur). Les clés sont chiffrées en base et ne sont jamais réaffichées ; chiffrement dérivé de `SECRET_KEY` : si vous la changez, les clés enregistrées deviennent illisibles et doivent être ressaisies.
@@ -84,7 +91,7 @@ APP_ENV=dev uvicorn app.main:app --reload     # SQLite locale (dev.db)
 ## Choix et limites
 
 - FastAPI + SQLAlchemy + pages HTML Jinja2 (pas de build front). Leaflet est embarqué dans `app/static/vendor`.
-- Les tables sont créées au démarrage (`create_all`), sans outil de migration : à ajouter (Alembic) avant de faire évoluer le schéma en production.
+- Les tables sont créées au démarrage (`create_all`) et les colonnes ajoutées par `app/migrations.py` (ajouts de colonnes uniquement, ni suppression ni modification) : pour des évolutions plus lourdes, passez à Alembic.
 - **Un seul worker** uvicorn : le rafraîchissement des sites tourne dans un thread du processus, et la limitation des tentatives de connexion est en mémoire.
 - Les sites viennent d'OSM : la qualité varie (beaucoup de sites sans nom, couverture inégale). Seule la France métropolitaine est importée. Ce sont les données OSM, pas un topo officiel.
 - Sources de données : © contributeurs OpenStreetMap (ODbL) ; météo [Open-Meteo](https://open-meteo.com/) (API gratuite pour usage non commercial, quota par IP).

@@ -4,6 +4,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from ..audit import audit
 from ..db import get_db
 from ..models import ROLE_LABELS, Club, ClubIntegration, Outing, Role, Site, SiteImport, User
 from ..security import (
@@ -35,8 +36,10 @@ def club_create(request: Request, name: str = Form(...), user: User = Depends(su
         flash(request, "Nom de club obligatoire.", "error")
     else:
         try:
-            db.add(Club(name=name))
+            club = Club(name=name)
+            db.add(club)
             db.commit()
+            audit("club.created", request, club_id=club.id, target=f"club:{club.id}", detail=name)
             flash(request, f"Club « {name} » créé.", "ok")
         except IntegrityError:
             db.rollback()
@@ -57,6 +60,7 @@ def club_delete(club_id: int, request: Request, user: User = Depends(super_requi
     else:
         db.delete(club)
         db.commit()
+        audit("club.deleted", request, club_id=club_id, target=f"club:{club_id}", detail=club.name)
         flash(request, "Club supprimé.", "ok")
     return RedirectResponse("/admin/clubs", status_code=303)
 
@@ -128,6 +132,7 @@ def user_create(request: Request, name: str = Form(...), email: str = Form(...),
                     password_hash=hash_password(temp), must_change_password=True)
     db.add(new_user)
     db.commit()
+    audit("user.created", request, club_id=target_club, target=f"user:{new_user.id}", detail=f"role={role}")
     if invite == "1" and not password and target_club and mailer.load_config(db, target_club):
         new_user.must_change_password = False   # la personne choisit son mot de passe via le lien
         db.commit()
@@ -161,6 +166,8 @@ def user_update(user_id: int, request: Request, role: str = Form(...), active: s
         target.role = role
     target.is_active = active == "1"
     db.commit()
+    audit("user.updated", request, club_id=target.club_id, target=f"user:{target.id}",
+          detail=f"role={target.role} active={target.is_active}")
     flash(request, f"{target.name} mis à jour.", "ok")
     return RedirectResponse("/admin/users", status_code=303)
 
@@ -174,6 +181,7 @@ def user_reset(user_id: int, request: Request, user: User = Depends(admin_requir
     target.must_change_password = True
     tokens.bump_epoch(db, target.id)   # déconnecte ses sessions ouvertes
     db.commit()
+    audit("user.password_reset_by_admin", request, club_id=target.club_id, target=f"user:{target.id}")
     return render(request, "admin_users.html", **_users_context(
         db, user, credentials=dict(email=target.email, password=temp)))
 
@@ -194,6 +202,7 @@ def sites_import_start(request: Request, background: BackgroundTasks,
     if sites_import.is_running():
         flash(request, "Un import est déjà en cours.", "error")
     else:
+        audit("sites.import_started", request)
         background.add_task(sites_import.run_import)
         flash(request, "Import lancé : cela peut prendre quelques minutes.", "ok")
     return RedirectResponse("/admin/sites", status_code=303)

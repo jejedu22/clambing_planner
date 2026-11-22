@@ -22,7 +22,7 @@
     <a href="/">Accueil</a>
     <a href="/outings">Sorties</a>
     <a href="/sites">Sites</a>
-    {% if user.is_admin %}<a href="/admin/users">Utilisateurs</a><a href="/admin/memberships">Adhésions</a><a href="/admin/integrations">Intégrations</a>{% endif %}
+    {% if user.is_admin %}<a href="/admin/users">Utilisateurs</a><a href="/admin/memberships">Adhésions</a><a href="/admin/integrations">Intégrations</a><a href="/admin/logs">Journal</a>{% endif %}
     {% if user.is_super %}<a href="/admin/clubs">Clubs</a><a href="/admin/sites">Import</a>{% endif %}
   </nav>
   <div class="who">

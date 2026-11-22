@@ -4,7 +4,9 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..audit import audit
 from ..db import get_db
+from ..logging_setup import mask_email
 from ..models import User, UserPref
 from ..security import Throttle, hash_password, login_required, password_error
 from ..services import notifications, tokens
@@ -13,8 +15,8 @@ from ..web import flash, render
 router = APIRouter()
 forgot_by_email = Throttle(limit=3, window=3600)
 forgot_by_ip = Throttle(limit=15, window=3600)
-GENERIC = ("Si un compte correspond à cette adresse et que l'envoi d'emails est activé pour son club, "
-           "un message vient d'être envoyé. Pensez à vérifier vos courriers indésirables.")
+GENERIC = ("Si un compte correspond à cette adresse, un message vient d'être envoyé. "
+           "Pensez à vérifier vos courriers indésirables.")
 
 
 @router.get("/forgot")
@@ -28,10 +30,14 @@ def forgot(request: Request, background: BackgroundTasks, email: str = Form(...)
     email = email.strip().lower()[:255]
     ip = request.client.host if request.client else "?"
     # Même réponse dans tous les cas : on ne révèle pas si le compte existe.
-    if not (forgot_by_ip.blocked(ip) or forgot_by_email.blocked(email)):
+    if forgot_by_ip.blocked(ip) or forgot_by_email.blocked(email):
+        audit("password.reset_throttled", request, target=mask_email(email))
+    else:
         forgot_by_ip.add(ip)
         forgot_by_email.add(email)
         user = db.scalar(select(User).where(User.email == email, User.is_active.is_(True)))
+        audit("password.reset_requested", request, club_id=user.club_id if user else None,
+              target=f"user:{user.id}" if user else mask_email(email), detail=None if user else "compte inconnu")
         if user is not None:
             background.add_task(notifications.send_reset, user.id)
     return render(request, "forgot.html", sent=True, message=GENERIC)
@@ -64,6 +70,8 @@ def reset(token: str, request: Request, new: str = Form(...), confirm: str = For
     tok.used_at = tokens.utcnow()
     tokens.bump_epoch(db, user.id)   # toutes les sessions existantes sont fermées
     db.commit()
+    audit("password.reset_done" if tok.purpose == "reset" else "account.activated", request,
+          actor=user, target=f"user:{user.id}")
     request.session.clear()
     flash(request, "Mot de passe défini. Vous pouvez vous connecter.", "ok")
     return RedirectResponse("/login", status_code=303)
@@ -78,5 +86,6 @@ def notifications_pref(request: Request, notify: str = Form(""), user: User = De
         db.add(pref)
     pref.notify_email = notify == "1"
     db.commit()
+    audit("account.notifications", request, target=f"user:{user.id}", detail="on" if pref.notify_email else "off")
     flash(request, "Préférences enregistrées.", "ok")
     return RedirectResponse("/password", status_code=303)

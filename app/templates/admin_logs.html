@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Journal — Climbing Planner{% endblock %}
+{% block content %}
+<h1>Journal d'audit <small class="muted">({{ total }})</small></h1>
+<p class="muted">Connexions, changements de mot de passe, gestion des utilisateurs et des intégrations. Aucun mot de passe ni clé n'y figure.</p>
+<form class="filters" method="get" action="/admin/logs">
+  <input type="search" name="event" value="{{ event }}" placeholder="Événement (ex. login, password, user…)">
+  {% if clubs %}<select name="club"><option value="">Tous les clubs</option>
+    {% for c in clubs %}<option value="{{ c.id }}" {{ 'selected' if club == c.id }}>{{ c.name }}</option>{% endfor %}</select>{% endif %}
+  <button>Filtrer</button>
+</form>
+<div class="table-wrap"><table>
+  <tr><th>Date</th><th>Événement</th><th>Acteur</th>{% if user.is_super %}<th>Club</th>{% endif %}<th>Cible</th><th>Détail</th><th>IP</th></tr>
+  {% for r in rows %}
+  <tr><td>{{ r.at.strftime('%d/%m/%Y %H:%M:%S') }}</td><td><code>{{ r.event }}</code></td><td>{{ r.actor_label or '—' }}</td>
+    {% if user.is_super %}<td>{{ club_names.get(r.club_id, '—') }}</td>{% endif %}
+    <td>{{ r.target or '' }}</td><td>{{ r.detail or '' }}</td><td>{{ r.ip or '' }}</td></tr>
+  {% else %}<tr><td colspan="7" class="muted">Aucun événement.</td></tr>{% endfor %}
+</table></div>
+{% if pages > 1 %}
+<p class="pager">{% set qs = 'event=' ~ (event | urlencode) ~ ('&club=' ~ club if club else '') %}
+  {% if page > 1 %}<a href="/admin/logs?{{ qs }}&page={{ page - 1 }}">← Plus récents</a>{% endif %}
+  Page {{ page }} / {{ pages }}
+  {% if page < pages %}<a href="/admin/logs?{{ qs }}&page={{ page + 1 }}">Plus anciens →</a>{% endif %}</p>
+{% endif %}
+{% endblock %}

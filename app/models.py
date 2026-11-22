@@ -242,3 +242,20 @@ class OutingReminder(Base):
 
     outing_id: Mapped[int] = mapped_column(ForeignKey("outings.id"), primary_key=True)
     sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class AuditLog(Base):
+    """Journal d'audit : événements de sécurité et d'administration (jamais de secrets)."""
+
+    __tablename__ = "audit_logs"
+    __table_args__ = (Index("ix_audit_club_at", "club_id", "at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    event: Mapped[str] = mapped_column(String(60), index=True)
+    actor_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    actor_label: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    club_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    target: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    detail: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    ip: Mapped[str | None] = mapped_column(String(64), nullable=True)

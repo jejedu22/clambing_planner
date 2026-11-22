@@ -29,6 +29,21 @@ class Settings:
         self.weather_url = os.environ.get("WEATHER_URL", "https://api.open-meteo.com/v1/forecast")
         self.timezone = os.environ.get("TZ", "Europe/Paris")
         self.user_agent = "climbing-planner/1.0"
+        # Envoi d'emails classique (SMTP) : réservé au mot de passe oublié
+        self.smtp_host = os.environ.get("SMTP_HOST", "").strip()
+        self.smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+        self.smtp_user = os.environ.get("SMTP_USER", "")
+        self.smtp_password = os.environ.get("SMTP_PASSWORD", "")
+        self.smtp_from = os.environ.get("SMTP_FROM", "").strip()
+        self.smtp_from_name = os.environ.get("SMTP_FROM_NAME", "Climbing Planner")
+        self.smtp_security = os.environ.get("SMTP_SECURITY", "starttls").lower()  # starttls | ssl | none
+        # Journalisation
+        self.log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
+        self.log_format = os.environ.get("LOG_FORMAT", "text").lower()          # text | json
+        self.log_file = os.environ.get("LOG_FILE", "").strip()                   # vide = sortie standard seule
+        self.log_max_mb = int(os.environ.get("LOG_MAX_MB", "10"))
+        self.log_backups = int(os.environ.get("LOG_BACKUPS", "5"))
+        self.audit_retention_days = int(os.environ.get("AUDIT_RETENTION_DAYS", "180"))
         # URL publique de l'application, utilisée dans les liens des emails.
         # Volontairement jamais déduite de l'en-tête Host (risque d'empoisonnement des liens).
         self.app_base_url = os.environ.get("APP_BASE_URL", "").rstrip("/")

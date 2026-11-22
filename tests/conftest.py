@@ -1,7 +1,7 @@
 import os
 
 os.environ.update(APP_ENV="test", DATABASE_URL="sqlite:///./test.db", SECRET_KEY="test-secret",
-                  COOKIE_SECURE="0", SUPERADMIN_EMAIL="root@test.org", SUPERADMIN_PASSWORD="rootpassword123", APP_BASE_URL="https://escalade.test")
+                  COOKIE_SECURE="0", SUPERADMIN_EMAIL="root@test.org", SUPERADMIN_PASSWORD="rootpassword123", APP_BASE_URL="https://escalade.test", SMTP_HOST="smtp.test", SMTP_FROM="no-reply@test.org")
 
 import re
 import pytest
@@ -94,3 +94,17 @@ def enable_helloasso(db, club_id, form="adhesion-2026"):
     integ.ha_client_id, integ.ha_client_secret_enc = "client-id-1", crypto.encrypt("hasecretvalue")
     integ.ha_org_slug, integ.ha_membership_form = "mon-club", form
     db.merge(integ); db.commit()
+
+
+@pytest.fixture()
+def smtp_outbox(monkeypatch):
+    """Remplace la connexion SMTP : enregistre les messages (destinataire, sujet, texte)."""
+    from app.services import smtp_mailer
+    sent = []
+
+    def fake_deliver(msg):
+        sent.append({"to": msg["To"], "subject": msg["Subject"], "from": msg["From"],
+                     "text": msg.get_body(("plain",)).get_content(), "html": msg.get_body(("html",)).get_content()})
+
+    monkeypatch.setattr(smtp_mailer, "_deliver", fake_deliver)
+    return sent

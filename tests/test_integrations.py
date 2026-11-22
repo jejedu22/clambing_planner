@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.models import (AuthToken, ClubIntegration, Membership, Outing, OutingForm, Participation,
+from app.models import (AuditLog, AuthToken, ClubIntegration, Membership, Outing, OutingForm, Participation,
                         Role, User, UserPref)
 from app.services import crypto, helloasso, mailer, memberships, notifications, tokens
 from .conftest import (client_for, csrf, enable_helloasso, enable_mailjet, make_user, recipients)
@@ -33,14 +33,22 @@ def test_crypto_roundtrip_and_tamper():
     assert crypto.decrypt(token[:-4] + "AAAA") is None and crypto.decrypt(None) is None
 
 
-# --- mot de passe oublié ------------------------------------------------------
+# --- mot de passe oublié (SMTP classique, indépendant de Mailjet) ----------------
 
-def test_forgot_password_full_flow(world, db, outbox):
-    enable_mailjet(db, world["a"].id)
-    r = post_forgot("member_a@test.org")
+def smtp_link(smtp_outbox):
+    return re.search(r"https://escalade\.test(/reset/\S+)", smtp_outbox[-1]["text"]).group(1)
+
+
+def smtp_to(smtp_outbox):
+    return sorted(re.search(r"<(.+)>", m["to"]).group(1) for m in smtp_outbox)
+
+
+def test_forgot_password_full_flow(world, db, smtp_outbox, outbox):
+    r = post_forgot("member_a@test.org")           # le club n'a PAS Mailjet : le SMTP suffit
     assert r.status_code == 200 and "un message vient d" in r.text
-    assert recipients(outbox) == ["member_a@test.org"]
-    path = link_from(outbox)
+    assert smtp_to(smtp_outbox) == ["member_a@test.org"] and outbox == []     # rien ne passe par Mailjet
+    assert smtp_outbox[0]["from"].endswith("<no-reply@test.org>")
+    path = smtp_link(smtp_outbox)
 
     old = client_for("member_a@test.org")             # une session ouverte avant la réinitialisation
     assert old.get("/outings").status_code == 200
@@ -56,55 +64,65 @@ def test_forgot_password_full_flow(world, db, outbox):
     assert old.get("/outings", follow_redirects=False).headers["location"] == "/login"   # sessions fermées
 
 
-def test_forgot_does_not_reveal_accounts(world, db, outbox):
-    enable_mailjet(db, world["a"].id)
-    known = post_forgot("member_a@test.org").text
-    unknown = post_forgot("nobody@test.org").text
-    no_mail_club = post_forgot("admin_b@test.org").text      # club B sans Mailjet
-    strip = lambda t: re.sub(r'name="csrf" value="[^"]+"', "", t)
-    assert strip(known) == strip(unknown) == strip(no_mail_club)
-    assert recipients(outbox) == ["member_a@test.org"]
-
-
-def test_forgot_super_admin_gets_nothing(world, db, outbox):
-    enable_mailjet(db, world["a"].id)
-    post_forgot("root@test.org")
-    assert outbox == []
-
-
-def test_forgot_is_throttled(world, db, outbox):
-    enable_mailjet(db, world["a"].id)
-    for _ in range(5):
-        post_forgot("member_a@test.org")
-    assert len(outbox) == 3
-
-
-def test_reset_token_expired_or_inactive(world, db, outbox):
+def test_forgot_works_even_when_club_has_mailjet(world, db, smtp_outbox, outbox):
     enable_mailjet(db, world["a"].id)
     post_forgot("member_a@test.org")
-    path = link_from(outbox)
+    assert len(smtp_outbox) == 1 and outbox == []     # Mailjet reste réservé aux invitations/notifications
+
+
+def test_forgot_does_not_reveal_accounts(world, db, smtp_outbox):
+    known = post_forgot("member_a@test.org").text
+    unknown = post_forgot("nobody@test.org").text
+    strip = lambda t: re.sub(r'name="csrf" value="[^"]+"', "", t)
+    assert strip(known) == strip(unknown)
+    assert smtp_to(smtp_outbox) == ["member_a@test.org"]
+
+
+def test_forgot_super_admin_now_works(world, db, smtp_outbox):
+    post_forgot("root@test.org")                       # le super administrateur n'a pas de club
+    assert smtp_to(smtp_outbox) == ["root@test.org"]
+    path = smtp_link(smtp_outbox); c = TestClient(app)
+    c.post(path, data={"new": "new-root-password1", "confirm": "new-root-password1", "csrf": csrf(c, path)})
+    assert client_for("root@test.org", "new-root-password1").get("/outings").status_code == 200
+
+
+def test_forgot_without_smtp_sends_nothing(world, db, smtp_outbox, monkeypatch):
+    from app.config import settings
+    monkeypatch.setattr(settings, "smtp_host", "")
+    r = post_forgot("member_a@test.org")
+    assert r.status_code == 200 and smtp_outbox == [] and db.query(AuditLog).filter_by(event="password.reset_unavailable").count() == 1
+    assert db.query(AuthToken).count() == 0            # pas de jeton créé pour rien
+
+
+def test_forgot_is_throttled(world, db, smtp_outbox):
+    for _ in range(5):
+        post_forgot("member_a@test.org")
+    assert len(smtp_outbox) == 3
+    assert db.query(AuditLog).filter_by(event="password.reset_throttled").count() == 2
+
+
+def test_reset_token_expired_or_inactive(world, db, smtp_outbox):
+    post_forgot("member_a@test.org")
+    path = smtp_link(smtp_outbox)
     tok = db.query(AuthToken).one()
     tok.expires_at = datetime.now(timezone.utc) - timedelta(minutes=1); db.commit()
     assert TestClient(app).get(path).status_code == 400
     assert TestClient(app).get("/reset/garbage").status_code == 400
-    # le jeton n'est pas stocké en clair
-    assert path.split("/")[-1] not in tok.token_hash
+    assert path.split("/")[-1] not in tok.token_hash      # le jeton n'est pas stocké en clair
 
 
-def test_new_reset_invalidates_previous_link(world, db, outbox):
-    enable_mailjet(db, world["a"].id)
-    post_forgot("member_a@test.org"); first = link_from(outbox)
-    post_forgot("member_a@test.org"); second = link_from(outbox)
+def test_new_reset_invalidates_previous_link(world, db, smtp_outbox):
+    post_forgot("member_a@test.org"); first = smtp_link(smtp_outbox)
+    post_forgot("member_a@test.org"); second = smtp_link(smtp_outbox)
     c = TestClient(app)
     assert c.get(first).status_code == 400 and c.get(second).status_code == 200
 
 
-def test_no_reset_link_without_base_url(world, db, outbox, monkeypatch):
+def test_no_reset_link_without_base_url(world, db, smtp_outbox, monkeypatch):
     from app.config import settings
-    enable_mailjet(db, world["a"].id)
     monkeypatch.setattr(settings, "app_base_url", "")
     post_forgot("member_a@test.org")
-    assert outbox == []
+    assert smtp_outbox == []
 
 
 # --- invitation ---------------------------------------------------------------

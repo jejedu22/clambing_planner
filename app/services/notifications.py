@@ -11,7 +11,8 @@ from sqlalchemy.orm import Session, joinedload
 from ..config import settings
 from ..db import SessionLocal
 from ..models import Outing, OutingReminder, Participation, User, UserPref, utcnow
-from . import mailer, tokens, weather
+from . import mailer, smtp_mailer, tokens, weather
+from ..audit import audit
 from ..web import fr_date, fr_time
 
 log = logging.getLogger("notifications")
@@ -124,14 +125,17 @@ def send_reminders() -> int:
 # --- Transactionnel : jamais soumis aux préférences de notification ----------
 
 def send_reset(user_id: int) -> bool:
+    """Lien de réinitialisation par SMTP classique (pas Mailjet) : fonctionne pour tous les comptes,
+    y compris le super administrateur qui n'a pas de club."""
     with SessionLocal() as db:
         user = db.get(User, user_id)
         if user is None or not user.is_active:
             return False
-        cfg = mailer.load_config(db, user.club_id)
         base = mailer.link("/reset/")
-        if cfg is None or base is None:
-            log.warning("Réinitialisation demandée mais Mailjet/APP_BASE_URL non configuré (utilisateur %s)", user.id)
+        if not smtp_mailer.configured() or base is None:
+            log.warning("Réinitialisation demandée mais SMTP ou APP_BASE_URL non configuré")
+            audit("password.reset_unavailable", target=f"user:{user.id}", club_id=user.club_id,
+                  detail="SMTP ou APP_BASE_URL non configuré")
             return False
         raw = tokens.create_token(db, user, "reset")
         subject = "Réinitialisation de votre mot de passe"
@@ -139,8 +143,12 @@ def send_reset(user_id: int) -> bool:
             "Une réinitialisation de votre mot de passe a été demandée. Le lien est valable 1 heure.",
             "Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email."],
             ("Choisir un nouveau mot de passe", base + raw))
+        club_id, uid = user.club_id, user.id
         mail = mailer.Mail(user.email, user.name, subject, text, html)
-    return mailer.send(cfg, [mail])[0] == 1
+    ok, err = smtp_mailer.send(mail)
+    audit("password.reset_email_sent" if ok else "password.reset_email_failed",
+          target=f"user:{uid}", club_id=club_id, detail=err)
+    return ok
 
 
 def send_invite(db: Session, user: User) -> tuple[bool, str | None]:
@@ -168,6 +176,8 @@ def reminder_loop() -> None:
     while True:
         try:
             send_reminders()
+            from ..audit import purge
+            purge()
         except Exception:  # noqa: BLE001
             log.exception("Boucle des rappels")
         time.sleep(1800)

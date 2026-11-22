@@ -6,6 +6,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from ..audit import audit
 from ..db import get_db
 from ..models import Club, ClubIntegration, Membership, Role, User
 from ..security import admin_required, hash_password, generate_password
@@ -86,6 +87,7 @@ def mailjet_save(request: Request, club_id: int | None = Form(None), api_key: st
     if api_secret:
         integ.mj_api_secret_enc = crypto.encrypt(api_secret)
     db.commit()
+    audit("integration.mailjet_saved", request, club_id=club.id, target=f"club:{club.id}", detail="secret mis à jour" if api_secret else None)
     flash(request, "Configuration Mailjet enregistrée.", "ok")
     return _back(club, user)
 
@@ -130,6 +132,7 @@ def mailjet_delete(request: Request, club_id: int | None = Form(None), user: Use
     integ = _integ(db, club.id)
     integ.mj_api_key = integ.mj_api_secret_enc = integ.mj_from_email = integ.mj_from_name = None
     db.commit()
+    audit("integration.mailjet_deleted", request, club_id=club.id, target=f"club:{club.id}")
     flash(request, "Configuration Mailjet supprimée.", "ok")
     return _back(club, user)
 
@@ -161,6 +164,7 @@ def helloasso_save(request: Request, club_id: int | None = Form(None), client_id
     if client_secret:
         integ.ha_client_secret_enc = crypto.encrypt(client_secret)
     db.commit()
+    audit("integration.helloasso_saved", request, club_id=club.id, target=f"club:{club.id}", detail="secret mis à jour" if client_secret else None)
     flash(request, "Configuration HelloAsso enregistrée.", "ok")
     return _back(club, user)
 
@@ -206,6 +210,7 @@ def helloasso_delete(request: Request, club_id: int | None = Form(None), user: U
     for m in db.scalars(select(Membership).where(Membership.club_id == club.id)):
         db.delete(m)
     db.commit()
+    audit("integration.helloasso_deleted", request, club_id=club.id, target=f"club:{club.id}")
     flash(request, "Configuration HelloAsso et adhésions importées supprimées.", "ok")
     return _back(club, user)
 
@@ -239,6 +244,7 @@ def memberships_sync(request: Request, club_id: int | None = Form(None), user: U
         n = memberships.sync(db, club.id)
     except HelloAssoError as exc:
         return _memberships_page(request, user, db, club, 400, error=str(exc))
+    audit("memberships.synced", request, club_id=club.id, target=f"club:{club.id}", detail=f"{n} adhésion(s)")
     flash(request, f"{n} adhésion(s) synchronisée(s).", "ok")
     return RedirectResponse(f"/admin/memberships?club={club.id}" if user.is_super else "/admin/memberships",
                             status_code=303)
@@ -272,5 +278,7 @@ def memberships_invite(request: Request, club_id: int | None = Form(None), email
                 errors.append(f"{addr} : {err}")
         else:
             credentials.append({"email": addr, "password": temp})
+    if created:
+        audit("memberships.accounts_created", request, club_id=club.id, target=f"club:{club.id}", detail=f"{created} compte(s)")
     return _memberships_page(request, user, db, club, created=created, skipped=skipped,
                              credentials=credentials, mail_errors=errors)

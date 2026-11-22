@@ -31,7 +31,7 @@ L'application est servie sur `https://$APP_HOST` (routeur `climbing`, entrypoint
 3. **Clubs** → créer un club, puis **Utilisateurs** → créer son administrateur.
 4. L'administrateur du club crée ses membres. Il n'y a pas d'envoi d'email : un mot de passe provisoire est affiché une seule fois à transmettre à la personne, qui doit le changer à sa première connexion.
 
-Sauvegarde : volume Docker `pgdata` (`docker compose exec db pg_dump -U clambing clambing > backup.sql`).
+Sauvegarde : volume Docker `pgdata` (`docker compose exec db pg_dump -U climbing climbing > backup.sql`).
 
 ## Développement
 

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% from "_weather.html" import badge %}
+{% block content %}
+<h1>Prochaines sorties</h1>
+{% if user.is_admin %}<p><a class="btn" href="/outings/new">+ Nouvelle sortie</a></p>{% endif %}
+{% if not outings %}
+  <p class="muted">Aucune sortie à venir{% if not user.is_super and not user.club_id %}.{% endif %}</p>
+{% endif %}
+<div class="grid">
+{% for o in outings %}
+  <a class="card outing" href="/outings/{{ o.id }}">
+    <div class="date">{{ o.day | fr_date }}{% if o.meeting_time %} · {{ o.meeting_time | fr_time }}{% endif %}</div>
+    <h3>{{ o.title }}</h3>
+    <div>📍 {{ o.site.display_name }}{% if user.is_super %} · <em>{{ o.club.name }}</em>{% endif %}</div>
+    {% set f = forecasts[o.id] %}
+    {% if f %}{{ badge(f) }}{% else %}<span class="muted">Météo disponible 16 jours avant la sortie</span>{% endif %}
+    <div class="muted">{{ o.participations | selectattr('status','equalto','yes') | list | length }} inscrit(s){% if mine.get(o.id) %} · vous : {{ {'yes':'✅','maybe':'🤔','no':'❌'}[mine[o.id]] }}{% endif %}</div>
+  </a>
+{% endfor %}
+</div>
+{% endblock %}

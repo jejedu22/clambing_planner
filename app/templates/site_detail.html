@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% from "_weather.html" import day_card %}
+{% block title %}{{ site.display_name }} — Clambing Planner{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">{% endblock %}
+{% block content %}
+<p><a href="/sites">← Sites</a></p>
+<h1>{{ site.display_name }}</h1>
+<p>
+  {% for t in site.type_labels %}<span class="tag">{{ t }}</span>{% endfor %}
+  {% if not site.outdoor %}<span class="tag">Salle</span>{% endif %}
+  {% if site.rock %}<span class="tag">Roche : {{ site.rock }}</span>{% endif %}
+  {% if site.routes %}<span class="tag">{{ site.routes }} voies</span>{% endif %}
+</p>
+{% if site.description %}<p>{{ site.description }}</p>{% endif %}
+<p>
+  {% if site.website %}<a href="{{ site.website }}" rel="noopener noreferrer" target="_blank">Site web</a> ·{% endif %}
+  <a href="https://www.openstreetmap.org/{{ site.osm_id }}" rel="noopener noreferrer" target="_blank">Fiche OpenStreetMap</a> ·
+  <a href="https://www.google.com/maps/dir/?api=1&destination={{ site.lat }},{{ site.lon }}" rel="noopener noreferrer" target="_blank">Itinéraire</a>
+</p>
+{% if user.is_admin %}<p><a class="btn" href="/outings/new?site={{ site.id }}">Organiser une sortie ici</a></p>{% endif %}
+<div id="map" class="small" data-lat="{{ site.lat }}" data-lon="{{ site.lon }}"></div>
+<h2>Météo</h2>
+{% if forecast %}
+<div class="weather">{% for d in forecast %}{{ day_card(d) }}{% endfor %}</div>
+<p class="muted">Les trois premiers jours sont les jours passés : utile pour savoir si le rocher est sec.</p>
+{% else %}<p class="muted">Météo momentanément indisponible.</p>{% endif %}
+<script src="/static/vendor/leaflet/leaflet.js"></script>
+<script src="/static/map.js"></script>
+{% endblock %}

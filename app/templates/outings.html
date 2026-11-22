@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Sorties — Clambing Planner{% endblock %}
+{% block content %}
+<h1>{{ 'Sorties passées' if past else 'Sorties à venir' }}</h1>
+<p>
+  <a href="/outings?past={{ 0 if past else 1 }}">{{ 'Voir les sorties à venir' if past else 'Voir les sorties passées' }}</a>
+  {% if user.is_admin %} · <a class="btn" href="/outings/new">+ Nouvelle sortie</a>{% endif %}
+</p>
+{% if clubs %}
+<form class="filters" method="get"><input type="hidden" name="past" value="{{ past }}">
+  <select name="club" onchange="this.form.submit()"><option value="">Tous les clubs</option>
+  {% for c in clubs %}<option value="{{ c.id }}" {{ 'selected' if club == c.id }}>{{ c.name }}</option>{% endfor %}</select></form>
+{% endif %}
+<table>
+  <tr><th>Date</th><th>Sortie</th><th>Site</th>{% if user.is_super %}<th>Club</th>{% endif %}<th>Inscrits</th></tr>
+  {% for o in outings %}
+  <tr class="{{ 'cancelled' if o.cancelled }}">
+    <td>{{ o.day | fr_date(true) }}</td>
+    <td><a href="/outings/{{ o.id }}">{{ o.title }}</a>{% if o.cancelled %} <span class="tag">Annulée</span>{% endif %}</td>
+    <td>{{ o.site.display_name }}</td>
+    {% if user.is_super %}<td>{{ o.club.name }}</td>{% endif %}
+    <td>{{ o.participations | selectattr('status','equalto','yes') | list | length }}{% if o.max_participants %} / {{ o.max_participants }}{% endif %}</td>
+  </tr>
+  {% else %}<tr><td colspan="5" class="muted">Aucune sortie.</td></tr>{% endfor %}
+</table>
+{% endblock %}

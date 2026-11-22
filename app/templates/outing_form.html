@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Modifier' if outing else 'Nouvelle' }} sortie — Clambing Planner{% endblock %}
+{% block content %}
+{% set f = form or {} %}
+{% set cur_club = (f.club_id if f.club_id is defined else (outing.club_id if outing else '')) | string %}
+<h1>{{ 'Modifier la sortie' if outing else 'Nouvelle sortie' }}</h1>
+<form method="post" class="card">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  {% if user.is_super %}
+  <label>Club
+    <select name="club_id" required>
+      <option value="">—</option>
+      {% for c in clubs %}<option value="{{ c.id }}" {{ 'selected' if cur_club == c.id | string }}>{{ c.name }}</option>{% endfor %}
+    </select></label>
+  {% endif %}
+  <label>Titre <input name="title" required maxlength="160" value="{{ f.title if f.title is defined else (outing.title if outing else '') }}"></label>
+  <label>Site d'escalade
+    <input type="search" id="site-search" placeholder="Rechercher un site par nom…" autocomplete="off">
+    <ul id="site-results" class="list picker"></ul>
+    <input type="hidden" name="site_id" id="site-id" value="{{ site.id if site else '' }}">
+    <span id="site-chosen" class="tag">{{ site.display_name if site else 'Aucun site choisi' }}</span>
+  </label>
+  <label>Date <input type="date" name="day" required value="{{ f.day if f.day is defined else (outing.day.isoformat() if outing else '') }}"></label>
+  <label>Heure de rendez-vous <input type="time" name="meeting_time" value="{{ f.meeting_time if f.meeting_time is defined else (outing.meeting_time.strftime('%H:%M') if outing and outing.meeting_time else '') }}"></label>
+  <label>Lieu de rendez-vous <input name="meeting_point" maxlength="255" value="{{ f.meeting_point if f.meeting_point is defined else (outing.meeting_point or '' if outing else '') }}"></label>
+  <label>Nombre de places (vide = illimité) <input type="number" name="max_participants" min="1" max="500" value="{{ f.max_participants if f.max_participants is defined else (outing.max_participants or '' if outing else '') }}"></label>
+  <label>Description <textarea name="description" rows="5" maxlength="5000">{{ f.description if f.description is defined else (outing.description or '' if outing else '') }}</textarea></label>
+  <button>Enregistrer</button>
+</form>
+<script src="/static/picker.js"></script>
+{% endblock %}

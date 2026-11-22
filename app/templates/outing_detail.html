@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% from "_weather.html" import day_card %}
+{% block title %}{{ outing.title }} — Clambing Planner{% endblock %}
+{% block content %}
+<p><a href="/outings">← Sorties</a></p>
+<h1>{{ outing.title }} {% if outing.cancelled %}<span class="tag">Annulée</span>{% endif %}</h1>
+<p class="muted">{{ outing.club.name }}</p>
+<div class="card">
+  <p>📅 <strong>{{ outing.day | fr_date }}</strong>{% if outing.meeting_time %} · RDV {{ outing.meeting_time | fr_time }}{% endif %}</p>
+  {% if outing.meeting_point %}<p>🚗 RDV : {{ outing.meeting_point }}</p>{% endif %}
+  <p>📍 <a href="/sites/{{ outing.site.id }}">{{ outing.site.display_name }}</a>
+    {% for t in outing.site.type_labels %}<span class="tag">{{ t }}</span>{% endfor %}</p>
+  {% if outing.description %}<p style="white-space:pre-wrap">{{ outing.description }}</p>{% endif %}
+  {% if outing.max_participants %}<p>Places : {{ groups.yes | length }} / {{ outing.max_participants }}</p>{% endif %}
+</div>
+
+<h2>Météo sur place</h2>
+{% if forecast %}
+  <div class="weather">{{ day_card(forecast) }}</div>
+  <p class="verdict {{ forecast.verdict }}">{{ forecast.verdict_text }}</p>
+{% else %}
+  <p class="muted">Pas encore de prévision pour cette date (disponible jusqu'à 16 jours à l'avance).</p>
+{% endif %}
+
+<h2>Participation</h2>
+{% if not outing.cancelled %}
+<form method="post" action="/outings/{{ outing.id }}/respond" class="card inline-form">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <label class="inline">Places de covoiturage proposées
+    <input type="number" name="seats" min="0" max="8" value="{{ mine.seats if mine else 0 }}" style="width:5em"></label>
+  {% for key, label in statuses.items() %}
+    <button name="status" value="{{ key }}" class="{{ 'active' if mine and mine.status == key }}">{{ label }}</button>
+  {% endfor %}
+</form>
+{% endif %}
+{% if groups.yes %}<p class="muted">🚙 {{ seats }} place(s) de covoiturage proposée(s)</p>{% endif %}
+<div class="grid">
+{% for key, label in statuses.items() %}
+  <div class="card"><h3>{{ label }} ({{ groups[key] | length }})</h3>
+  <ul>{% for p in groups[key] %}<li>{{ p.user.name }}{% if p.seats %} · 🚙 {{ p.seats }}{% endif %}</li>{% endfor %}</ul></div>
+{% endfor %}
+</div>
+
+{% if can_edit %}
+<h2>Administration</h2>
+<div class="actions">
+  <a class="btn" href="/outings/{{ outing.id }}/edit">Modifier</a>
+  <form method="post" action="/outings/{{ outing.id }}/cancel"><input type="hidden" name="csrf" value="{{ csrf }}"><button>{{ 'Rétablir' if outing.cancelled else 'Annuler la sortie' }}</button></form>
+  <form method="post" action="/outings/{{ outing.id }}/delete" onsubmit="return confirm('Supprimer définitivement cette sortie ?')"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="danger">Supprimer</button></form>
+</div>
+{% endif %}
+{% endblock %}

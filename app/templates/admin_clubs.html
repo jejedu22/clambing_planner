@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Clubs — Clambing Planner{% endblock %}
+{% block content %}
+<h1>Clubs</h1>
+<form method="post" action="/admin/clubs" class="filters">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <input name="name" placeholder="Nom du nouveau club" required maxlength="120"><button>Créer le club</button>
+</form>
+<table>
+  <tr><th>Club</th><th>Utilisateurs</th><th></th></tr>
+  {% for club, n in rows %}
+  <tr><td>{{ club.name }}</td><td>{{ n }}</td>
+    <td><form method="post" action="/admin/clubs/{{ club.id }}/delete" onsubmit="return confirm('Supprimer ce club ?')"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="danger">Supprimer</button></form></td></tr>
+  {% else %}<tr><td colspan="3" class="muted">Aucun club.</td></tr>{% endfor %}
+</table>
+<p class="muted">Un club ne peut être supprimé que s'il n'a plus ni utilisateurs ni sorties. Créez ensuite son administrateur dans <a href="/admin/users">Utilisateurs</a>.</p>
+{% endblock %}

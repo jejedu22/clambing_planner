@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Import des sites — Clambing Planner{% endblock %}
+{% block content %}
+<h1>Import des sites d'escalade</h1>
+<p>{{ total }} site(s) en base. Source : OpenStreetMap (Overpass API), France métropolitaine. L'import est relancé automatiquement tous les 30 jours (<code>SITES_REFRESH_DAYS</code>).</p>
+<form method="post" action="/admin/sites/import"><input type="hidden" name="csrf" value="{{ csrf }}">
+  <button {{ 'disabled' if running }}>{{ 'Import en cours…' if running else 'Lancer un import maintenant' }}</button></form>
+<table>
+  <tr><th>Début</th><th>Fin</th><th>Statut</th><th>Sites</th><th>Erreur</th></tr>
+  {% for i in imports %}
+  <tr><td>{{ i.started_at.strftime('%d/%m/%Y %H:%M') }}</td><td>{{ i.finished_at.strftime('%d/%m/%Y %H:%M') if i.finished_at else '—' }}</td>
+    <td>{{ i.status }}</td><td>{{ i.count }}</td><td>{{ i.error or '' }}</td></tr>
+  {% else %}<tr><td colspan="5" class="muted">Aucun import pour l'instant.</td></tr>{% endfor %}
+</table>
+{% endblock %}

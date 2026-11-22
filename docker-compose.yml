@@ -1,0 +1,55 @@
+services:
+  app:
+    build: .
+    container_name: clambing-app
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://clambing:${POSTGRES_PASSWORD:?}@db:5432/clambing
+      SECRET_KEY: ${SECRET_KEY:?}
+      SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-}
+      SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:-}
+      SITES_REFRESH_DAYS: ${SITES_REFRESH_DAYS:-30}
+    networks:
+      - proxy      # exposé via Traefik
+      - internal   # accès à la base
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.clambing.rule=Host(`${APP_HOST:?}`)
+      - traefik.http.routers.clambing.entrypoints=websecure
+      - traefik.http.routers.clambing.tls.certresolver=letsencrypt
+      - traefik.http.routers.clambing.middlewares=default@file
+      - traefik.http.services.clambing.loadbalancer.server.port=8000
+
+  db:
+    image: postgres:16-alpine
+    container_name: clambing-db
+    restart: unless-stopped
+    mem_limit: 256m
+    environment:
+      POSTGRES_USER: clambing
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_DB: clambing
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clambing -d clambing"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - internal   # jamais exposé, ni sur le réseau proxy ni sur l'hôte
+
+volumes:
+  pgdata:
+
+networks:
+  proxy:
+    external: true
+  internal:
+    internal: true

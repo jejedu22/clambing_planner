@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Clambing Planner{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  {% block head %}{% endblock %}
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/">🧗 Clambing Planner</a>
+  {% if user %}
+  <nav>
+    <a href="/">Accueil</a>
+    <a href="/outings">Sorties</a>
+    <a href="/sites">Sites</a>
+    {% if user.is_admin %}<a href="/admin/users">Utilisateurs</a>{% endif %}
+    {% if user.is_super %}<a href="/admin/clubs">Clubs</a><a href="/admin/sites">Import</a>{% endif %}
+  </nav>
+  <div class="who">
+    <a href="/password" title="{{ user.role_label }}">{{ user.name }}</a>
+    <form method="post" action="/logout"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link">Déconnexion</button></form>
+  </div>
+  {% endif %}
+</header>
+<main>
+  {% for cat, msg in flashes %}<div class="flash {{ cat }}">{{ msg }}</div>{% endfor %}
+  {% if error %}<div class="flash error">{{ error }}</div>{% endif %}
+  {% block content %}{% endblock %}
+</main>
+<footer>
+  Sites : © contributeurs <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> (ODbL) ·
+  Météo : <a href="https://open-meteo.com/">Open-Meteo</a>
+</footer>
+</body>
+</html>

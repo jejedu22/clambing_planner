@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% from "_club_picker.html" import picker, hidden with context %}
+{% block title %}Adhésions — Climbing Planner{% endblock %}
+{% block content %}
+<h1>Adhésions HelloAsso{% if club %} <small class="muted">— {{ club.name }}</small>{% endif %}</h1>
+{{ picker(clubs, club, '/admin/memberships') }}
+{% if not club %}<p class="muted">Choisissez un club.</p>
+{% elif not (integ and integ.helloasso_ready and integ.ha_membership_form) %}
+  <p>HelloAsso n'est pas complètement configuré (identifiants et formulaire d'adhésion). <a href="/admin/integrations{{ '?club=' ~ club.id if user.is_super }}">Configurer</a></p>
+{% else %}
+  {% if credentials %}
+  <div class="flash ok"><strong>Comptes créés — mots de passe provisoires (affichés une seule fois)</strong>
+    <ul>{% for c in credentials %}<li><code>{{ c.email }}</code> — <code>{{ c.password }}</code></li>{% endfor %}</ul>
+    <small>Chaque personne devra le changer à sa première connexion. Configurez Mailjet pour envoyer des invitations par email à la place.</small></div>
+  {% endif %}
+  {% if created is defined %}<div class="flash ok">{{ created }} compte(s) créé(s){% if skipped %}, {{ skipped }} ignoré(s) (email déjà utilisé){% endif %}{% if mail_ok and created %} — invitations envoyées par email{% endif %}.</div>{% endif %}
+  {% for e in mail_errors or [] %}<div class="flash error">Invitation non envoyée — {{ e }}</div>{% endfor %}
+  <p class="muted">Dernière synchronisation : {{ integ.ha_synced_at.strftime('%d/%m/%Y %H:%M') if integ.ha_synced_at else 'jamais' }}.
+    L'email est celui du <strong>payeur</strong> HelloAsso : vérifiez-le (un parent peut payer pour son enfant).</p>
+  <div class="actions">
+    <form method="post" action="/admin/memberships/sync"><input type="hidden" name="csrf" value="{{ csrf }}">{{ hidden(club) }}<button>🔄 Synchroniser avec HelloAsso</button></form>
+    {% if rows %}<form method="post" action="/admin/memberships/invite" onsubmit="return confirm('Créer un compte pour tous les adhérents qui n\'en ont pas ?')"><input type="hidden" name="csrf" value="{{ csrf }}">{{ hidden(club) }}<input type="hidden" name="email" value="__all__"><button>{{ 'Inviter tous les adhérents sans compte' if mail_ok else 'Créer les comptes manquants' }}</button></form>{% endif %}
+  </div>
+  <table>
+    <tr><th>Adhérent</th><th>Email</th><th>Payé le</th><th>Cotisation</th><th>Compte</th></tr>
+    {% for m, current in rows %}
+    <tr>
+      <td>{{ m.full_name }}</td><td>{{ m.email }}</td>
+      <td>{{ m.paid_at.strftime('%d/%m/%Y') if m.paid_at else '—' }}</td>
+      <td>{% if current %}<span class="badge">✅ À jour</span>{% elif m.state not in ('Processed','Registered') %}<span class="badge bad">{{ {'Canceled':'Annulée','Waiting':'En attente','Refused':'Refusée','Abandoned':'Abandonnée','Deleted':'Supprimée'}.get(m.state, m.state) }}</span>{% else %}<span class="badge warn">Expirée</span>{% endif %}</td>
+      <td>{% if accounts.get(m.email) == 'yes' %}✔ Oui
+        {% elif accounts.get(m.email) == 'other' %}<span class="muted">Email utilisé dans un autre club</span>
+        {% else %}<form method="post" action="/admin/memberships/invite" style="margin:0"><input type="hidden" name="csrf" value="{{ csrf }}">{{ hidden(club) }}<input type="hidden" name="email" value="{{ m.email }}"><button>{{ 'Inviter' if mail_ok else 'Créer le compte' }}</button></form>{% endif %}</td>
+    </tr>
+    {% else %}<tr><td colspan="5" class="muted">Aucune adhésion importée : lancez une synchronisation.</td></tr>{% endfor %}
+  </table>
+{% endif %}
+{% endblock %}

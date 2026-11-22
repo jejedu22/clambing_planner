@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Modifier un utilisateur — Climbing Planner{% endblock %}
+{% block content %}
+{% set f = form or {} %}
+<p><a href="/admin/users">← Utilisateurs</a></p>
+<h1>Modifier {{ target.name }}</h1>
+<form method="post" action="/admin/users/{{ target.id }}/edit" class="card">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <div class="two-cols">
+    <label>Prénom <input name="first_name" maxlength="55" value="{{ f.first_name if f.first_name is defined else (target.first_name or '') }}"></label>
+    <label>Nom <input name="last_name" maxlength="55" value="{{ f.last_name if f.last_name is defined else (target.last_name or '') }}"></label>
+  </div>
+  <label>Email <input type="email" name="email" required value="{{ f.email if f.email is defined else target.email }}">
+    <small class="muted">C'est l'identifiant de connexion. Les liens de réinitialisation en attente seront invalidés si vous le changez.</small></label>
+  <label>Téléphone <input type="tel" name="phone" maxlength="32" value="{{ f.phone if f.phone is defined else (target.phone | phone) }}" placeholder="06 12 34 56 78"></label>
+  {% if target.is_super %}
+    <p class="muted">Rôle : {{ target.role_label }}</p>
+  {% else %}
+    {% set cur = f.role if f.role is defined else target.role %}
+    <label>Rôle <select name="role">{% for k, v in roles.items() if k != 'super_admin' %}<option value="{{ k }}" {{ 'selected' if cur == k }}>{{ v }}</option>{% endfor %}</select></label>
+  {% endif %}
+  <label class="inline"><input type="checkbox" name="active" value="1" {{ 'checked' if (f.active if f.active is defined else target.is_active) }}> Compte actif</label>
+  <p><button>Enregistrer</button> <a href="/admin/users">Annuler</a></p>
+</form>
+{% endblock %}

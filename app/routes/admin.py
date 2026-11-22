@@ -1,15 +1,19 @@
+import re
+
 from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from ..audit import audit
 from ..db import get_db
-from ..models import ROLE_LABELS, Club, Outing, Role, Site, SiteImport, User
+from ..models import ROLE_LABELS, Club, ClubIntegration, Outing, Role, Site, SiteImport, User
 from ..security import (
     admin_required, generate_password, hash_password, password_error, super_required,
 )
-from ..services import sites_import
+from ..services import memberships, people, notifications, sites_import, tokens, mailer
+from .dashboard import today
 from ..web import flash, render
 
 router = APIRouter(prefix="/admin")
@@ -34,8 +38,10 @@ def club_create(request: Request, name: str = Form(...), user: User = Depends(su
         flash(request, "Nom de club obligatoire.", "error")
     else:
         try:
-            db.add(Club(name=name))
+            club = Club(name=name)
+            db.add(club)
             db.commit()
+            audit("club.created", request, club_id=club.id, target=f"club:{club.id}", detail=name)
             flash(request, f"Club « {name} » créé.", "ok")
         except IntegrityError:
             db.rollback()
@@ -56,6 +62,7 @@ def club_delete(club_id: int, request: Request, user: User = Depends(super_requi
     else:
         db.delete(club)
         db.commit()
+        audit("club.deleted", request, club_id=club_id, target=f"club:{club_id}", detail=club.name)
         flash(request, "Club supprimé.", "ok")
     return RedirectResponse("/admin/clubs", status_code=303)
 
@@ -71,35 +78,75 @@ def _manageable(actor: User, target: User) -> bool:
     return target.club_id == actor.club_id and not target.is_super
 
 
-def _users_context(db: Session, actor: User, **extra):
-    q = select(User).order_by(User.club_id, User.name)
-    if not actor.is_super:
-        q = q.where(User.club_id == actor.club_id)
-    users = db.scalars(q).all()
+PAGE = 50
+
+
+def users_query(actor: User, q: str = "", club: int | None = None):
+    """Utilisateurs visibles par `actor` (un administrateur de club ne voit que son club)."""
+    stmt = select(User)
+    if actor.is_super:
+        if club:
+            stmt = stmt.where(User.club_id == club)
+    else:
+        stmt = stmt.where(User.club_id == actor.club_id)
+    q = q.strip()[:100]
+    if q:
+        like = "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        conds = [User.name.ilike(like, escape="\\"), User.email.ilike(like, escape="\\"),
+                 User.phone.ilike(like, escape="\\")]
+        digits = re.sub(r"[ .\-+()]", "", q)
+        if len(digits) >= 3 and digits.isdigit():
+            # les numéros sont stockés au format international : « 0698… » doit trouver « +33698… »
+            conds.append(User.phone.like("%" + ("33" + digits[1:] if digits.startswith("0") else digits) + "%"))
+        stmt = stmt.where(or_(*conds))
+    return stmt
+
+
+def dues_for(db: Session, club_ids) -> dict[str, bool]:
+    dues: dict[str, bool] = {}
+    for cid in {c for c in club_ids if c}:
+        integ = db.get(ClubIntegration, cid)
+        if integ and integ.ha_membership_form:
+            dues.update({e: ok for e, (_, ok) in memberships.status_by_email(db, cid, today()).items()})
+    return dues
+
+
+def _users_context(db: Session, actor: User, q: str = "", club: int | None = None, page: int = 1, **extra):
+    stmt = users_query(actor, q, club)
+    total = db.scalar(select(func.count()).select_from(stmt.subquery()))
+    page = max(page, 1)
+    users = db.scalars(stmt.order_by(User.club_id, func.lower(func.coalesce(User.last_name, User.name)),
+                                     func.lower(func.coalesce(User.first_name, "")))
+                       .offset((page - 1) * PAGE).limit(PAGE)).all()
     clubs = db.scalars(select(Club).order_by(Club.name)).all() if actor.is_super else []
     names = {c.id: c.name for c in db.scalars(select(Club))}
     roles = ROLE_LABELS if actor.is_super else {k: v for k, v in ROLE_LABELS.items()
                                                 if k != Role.SUPER_ADMIN.value}
-    return dict(users=users, clubs=clubs, club_names=names, roles=roles,
-                manageable={u.id: _manageable(actor, u) for u in users}, **extra)
+    return dict(users=users, clubs=clubs, club_names=names, roles=roles, dues=dues_for(db, [u.club_id for u in users]),
+                manageable={u.id: _manageable(actor, u) for u in users},
+                mail_ok=bool(actor.club_id and mailer.load_config(db, actor.club_id)),
+                q=q.strip()[:100], club_filter=club, total=total, page=page, pages=max(1, -(-total // PAGE)), **extra)
 
 
 @router.get("/users")
-def users_page(request: Request, user: User = Depends(admin_required), db: Session = Depends(get_db)):
-    return render(request, "admin_users.html", **_users_context(db, user))
+def users_page(request: Request, q: str = "", club: int | None = None, page: int = 1,
+               user: User = Depends(admin_required), db: Session = Depends(get_db)):
+    return render(request, "admin_users.html", **_users_context(db, user, q, club, page))
 
 
 @router.post("/users")
-def user_create(request: Request, name: str = Form(...), email: str = Form(...),
-                role: str = Form(Role.MEMBER.value), club_id: str = Form(""),
-                password: str = Form(""), user: User = Depends(admin_required),
+def user_create(request: Request, first_name: str = Form(""), last_name: str = Form(""), email: str = Form(...),
+                phone: str = Form(""), role: str = Form(Role.MEMBER.value), club_id: str = Form(""),
+                password: str = Form(""), invite: str = Form(""), user: User = Depends(admin_required),
                 db: Session = Depends(get_db)):
-    email = email.strip().lower()
-    name = name.strip()[:120]
+    error = None
+    try:
+        first_name, last_name, email, phone = people.validate_person(first_name, last_name, email, phone)
+    except people.ValidationError as exc:
+        error = str(exc)
     allowed = ROLE_LABELS if user.is_super else {k: v for k, v in ROLE_LABELS.items()
                                                  if k != Role.SUPER_ADMIN.value}
-    error = None
-    if role not in allowed:
+    if not error and role not in allowed:
         error = "Rôle invalide."
     if user.is_super:
         target_club = int(club_id) if club_id.isdigit() else None
@@ -109,8 +156,6 @@ def user_create(request: Request, name: str = Form(...), email: str = Form(...),
             error = error or "Choisissez un club."
     else:
         target_club = user.club_id
-    if not error and ("@" not in email or not name):
-        error = "Nom et email valides obligatoires."
     temp = password or generate_password()
     if not error and password:
         error = password_error(password)
@@ -118,9 +163,22 @@ def user_create(request: Request, name: str = Form(...), email: str = Form(...),
         error = "Cet email est déjà utilisé."
     if error:
         return render(request, "admin_users.html", 400, error=error, **_users_context(db, user))
-    db.add(User(email=email, name=name, role=role, club_id=target_club,
-                password_hash=hash_password(temp), must_change_password=True))
+    new_user = User(email=email, first_name=first_name, last_name=last_name, phone=phone, role=role, club_id=target_club,
+                    password_hash=hash_password(temp), must_change_password=True)
+    db.add(new_user)
     db.commit()
+    audit("user.created", request, club_id=target_club, target=f"user:{new_user.id}", detail=f"role={role}")
+    if invite == "1" and not password and target_club and mailer.load_config(db, target_club):
+        new_user.must_change_password = False   # la personne choisit son mot de passe via le lien
+        db.commit()
+        ok, err = notifications.send_invite(db, new_user)
+        if ok:
+            return render(request, "admin_users.html", **_users_context(db, user, invited=email))
+        # échec d'envoi : on retombe sur le mot de passe provisoire à transmettre à la main
+        new_user.must_change_password = True
+        db.commit()
+        return render(request, "admin_users.html", **_users_context(
+            db, user, credentials=dict(email=email, password=temp), invite_error=err))
     return render(request, "admin_users.html", **_users_context(
         db, user, credentials=dict(email=email, password=temp)))
 
@@ -143,6 +201,8 @@ def user_update(user_id: int, request: Request, role: str = Form(...), active: s
         target.role = role
     target.is_active = active == "1"
     db.commit()
+    audit("user.updated", request, club_id=target.club_id, target=f"user:{target.id}",
+          detail=f"role={target.role} active={target.is_active}")
     flash(request, f"{target.name} mis à jour.", "ok")
     return RedirectResponse("/admin/users", status_code=303)
 
@@ -154,7 +214,9 @@ def user_reset(user_id: int, request: Request, user: User = Depends(admin_requir
     temp = generate_password()
     target.password_hash = hash_password(temp)
     target.must_change_password = True
+    tokens.bump_epoch(db, target.id)   # déconnecte ses sessions ouvertes
     db.commit()
+    audit("user.password_reset_by_admin", request, club_id=target.club_id, target=f"user:{target.id}")
     return render(request, "admin_users.html", **_users_context(
         db, user, credentials=dict(email=target.email, password=temp)))
 
@@ -175,6 +237,7 @@ def sites_import_start(request: Request, background: BackgroundTasks,
     if sites_import.is_running():
         flash(request, "Un import est déjà en cours.", "error")
     else:
+        audit("sites.import_started", request)
         background.add_task(sites_import.run_import)
         flash(request, "Import lancé : cela peut prendre quelques minutes.", "ok")
     return RedirectResponse("/admin/sites", status_code=303)

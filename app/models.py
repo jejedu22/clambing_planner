@@ -7,6 +7,7 @@ from sqlalchemy import (
     Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, Time,
     UniqueConstraint, Index,
 )
+from sqlalchemy import event
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -45,7 +46,11 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(String(255), unique=True)
+    # `name` = nom d'affichage, maintenu automatiquement à partir de first_name + last_name
     name: Mapped[str] = mapped_column(String(120))
+    first_name: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    last_name: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(32), nullable=True)  # format international normalisé
     password_hash: Mapped[str] = mapped_column(String(100))
     role: Mapped[str] = mapped_column(String(20), default=Role.MEMBER.value)
     # Un super administrateur n'appartient à aucun club
@@ -67,6 +72,21 @@ class User(Base):
     @property
     def role_label(self) -> str:
         return ROLE_LABELS.get(self.role, self.role)
+
+
+def split_name(full: str) -> tuple[str, str]:
+    """Découpe « Prénom Nom » (premier mot = prénom) pour les comptes créés sans prénom/nom séparés."""
+    parts = (full or "").split(None, 1)
+    return (parts[0], parts[1] if len(parts) > 1 else "") if parts else ("", "")
+
+
+@event.listens_for(User, "before_insert")
+@event.listens_for(User, "before_update")
+def _sync_display_name(mapper, connection, user: User) -> None:
+    if user.first_name or user.last_name:
+        user.name = f"{user.first_name or ''} {user.last_name or ''}".strip()
+    elif user.name:
+        user.first_name, user.last_name = split_name(user.name)
 
 
 TYPE_LABELS = {
@@ -153,3 +173,109 @@ class Participation(Base):
 
     outing: Mapped[Outing] = relationship(back_populates="participations")
     user: Mapped[User] = relationship()
+
+
+# --- Emails, jetons, intégrations (tables ajoutées : create_all les crée sur une base existante) ---
+
+class ClubIntegration(Base):
+    """Réglages d'un club : Mailjet (envoi d'emails) et HelloAsso (adhésions, paiements)."""
+
+    __tablename__ = "club_integrations"
+
+    club_id: Mapped[int] = mapped_column(ForeignKey("clubs.id"), primary_key=True)
+    mj_api_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    mj_api_secret_enc: Mapped[str | None] = mapped_column(Text, nullable=True)  # chiffré
+    mj_from_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    mj_from_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    ha_client_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    ha_client_secret_enc: Mapped[str | None] = mapped_column(Text, nullable=True)  # chiffré
+    ha_org_slug: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    ha_membership_form: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    membership_mode: Mapped[str] = mapped_column(String(10), default="season")  # season | rolling
+    ha_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    @property
+    def mailjet_ready(self) -> bool:
+        return bool(self.mj_api_key and self.mj_api_secret_enc and self.mj_from_email)
+
+    @property
+    def helloasso_ready(self) -> bool:
+        return bool(self.ha_client_id and self.ha_client_secret_enc and self.ha_org_slug)
+
+
+class UserPref(Base):
+    __tablename__ = "user_prefs"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    notify_email: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Incrémenté à chaque changement de mot de passe : invalide les autres sessions
+    session_epoch: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class AuthToken(Base):
+    """Jeton à usage unique (mot de passe oublié, invitation). Seul le hash est stocké."""
+
+    __tablename__ = "auth_tokens"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    purpose: Mapped[str] = mapped_column(String(10))  # reset | invite
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Membership(Base):
+    """Adhésion importée depuis HelloAsso."""
+
+    __tablename__ = "memberships"
+    __table_args__ = (UniqueConstraint("club_id", "ha_item_id"), Index("ix_memberships_email", "club_id", "email"))
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    club_id: Mapped[int] = mapped_column(ForeignKey("clubs.id"))
+    ha_item_id: Mapped[str] = mapped_column(String(30))
+    email: Mapped[str] = mapped_column(String(255))
+    first_name: Mapped[str] = mapped_column(String(120), default="")
+    last_name: Mapped[str] = mapped_column(String(120), default="")
+    state: Mapped[str] = mapped_column(String(20))
+    amount_cents: Mapped[int] = mapped_column(Integer, default=0)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    @property
+    def full_name(self) -> str:
+        return f"{self.first_name} {self.last_name}".strip() or self.email
+
+
+class OutingForm(Base):
+    """Formulaire HelloAsso lié à une sortie (paiement)."""
+
+    __tablename__ = "outing_forms"
+
+    outing_id: Mapped[int] = mapped_column(ForeignKey("outings.id"), primary_key=True)
+    form_type: Mapped[str] = mapped_column(String(20))
+    form_slug: Mapped[str] = mapped_column(String(120))
+    form_title: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+
+class OutingReminder(Base):
+    __tablename__ = "outing_reminders"
+
+    outing_id: Mapped[int] = mapped_column(ForeignKey("outings.id"), primary_key=True)
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class AuditLog(Base):
+    """Journal d'audit : événements de sécurité et d'administration (jamais de secrets)."""
+
+    __tablename__ = "audit_logs"
+    __table_args__ = (Index("ix_audit_club_at", "club_id", "at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    event: Mapped[str] = mapped_column(String(60), index=True)
+    actor_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    actor_label: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    club_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    target: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    detail: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    ip: Mapped[str | None] = mapped_column(String(64), nullable=True)

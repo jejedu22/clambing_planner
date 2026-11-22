@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Mot de passe oublié — Climbing Planner{% endblock %}
+{% block content %}
+<section class="card narrow">
+  <h1>Mot de passe oublié</h1>
+  {% if sent %}
+    <p>{{ message }}</p>
+    <p class="muted">Pas d'email au bout de quelques minutes ? Demandez à votre administrateur de réinitialiser votre mot de passe.</p>
+    <p><a href="/login">Retour à la connexion</a></p>
+  {% else %}
+  <form method="post" action="/forgot">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Votre email <input type="email" name="email" required autofocus autocomplete="username"></label>
+    <button>Recevoir un lien</button>
+  </form>
+  <p><a href="/login">Retour à la connexion</a></p>
+  {% endif %}
+</section>
+{% endblock %}

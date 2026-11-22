@@ -100,12 +100,12 @@ def test_super_admin_sees_everything(world, db):
 
 def test_club_admin_user_management_is_scoped(world, db):
     c = client_for("admin_a@test.org")
-    r = c.post("/admin/users", data={"name": "Nouveau", "email": "new@test.org", "role": "member",
+    r = c.post("/admin/users", data={"first_name": "Nouveau", "last_name": "Test", "email": "new@test.org", "role": "member",
                                      "club_id": world["b"].id, "csrf": csrf(c, "/admin/users")})
     assert r.status_code == 200 and "Mot de passe provisoire" in r.text
     assert db.query(User).filter_by(email="new@test.org").one().club_id == world["a"].id
     # impossible de créer un super administrateur
-    r = c.post("/admin/users", data={"name": "X", "email": "x@test.org", "role": "super_admin",
+    r = c.post("/admin/users", data={"first_name": "X", "last_name": "Test", "email": "x@test.org", "role": "super_admin",
                                      "csrf": csrf(c, "/admin/users")})
     assert r.status_code == 400
     # impossible de modifier un utilisateur d'un autre club
@@ -122,7 +122,7 @@ def test_super_admin_creates_club_and_admin(world, db):
     root.post("/admin/clubs", data={"name": "Club C", "csrf": csrf(root, "/admin/clubs")})
     from app.models import Club
     club = db.query(Club).filter_by(name="Club C").one()
-    r = root.post("/admin/users", data={"name": "Boss C", "email": "boss@test.org", "role": "club_admin",
+    r = root.post("/admin/users", data={"first_name": "Boss C", "last_name": "Test", "email": "boss@test.org", "role": "club_admin",
                                         "club_id": club.id, "csrf": csrf(root, "/admin/users")})
     assert r.status_code == 200
     u = db.query(User).filter_by(email="boss@test.org").one()

@@ -5,6 +5,7 @@ from fastapi import Request
 from fastapi.templating import Jinja2Templates
 
 from .security import csrf_token
+from .services.people import format_phone
 
 BASE = Path(__file__).parent
 templates = Jinja2Templates(directory=BASE / "templates")
@@ -26,6 +27,7 @@ def fr_time(t: time | None) -> str:
 
 templates.env.filters["fr_date"] = fr_date
 templates.env.filters["fr_time"] = fr_time
+templates.env.filters["phone"] = format_phone
 
 
 def flash(request: Request, message: str, category: str = "info") -> None:

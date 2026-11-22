@@ -2,13 +2,14 @@
 from __future__ import annotations
 
 import secrets
+import time
 
 import bcrypt
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from .db import get_db
-from .models import User
+from .models import User, UserPref
 
 MIN_PASSWORD = 10
 MAX_PASSWORD_BYTES = 72  # limite de bcrypt
@@ -72,8 +73,40 @@ def current_user_optional(request: Request, db: Session = Depends(get_db)) -> Us
     user = db.get(User, uid) if uid else None
     if user is not None and not user.is_active:
         user = None
+    if user is not None and request.session.get("ep", 0) != session_epoch(db, user.id):
+        user = None   # mot de passe changé depuis : cette session n'est plus valable
     request.state.user = user
     return user
+
+
+def session_epoch(db: Session, user_id: int) -> int:
+    pref = db.get(UserPref, user_id)
+    return pref.session_epoch if pref else 0
+
+
+class Throttle:
+    """Limite en mémoire : `limit` événements par `window` secondes et par clé."""
+
+    def __init__(self, limit: int, window: int) -> None:
+        self.limit, self.window, self.hits = limit, window, {}
+
+    def count(self, key: str) -> int:
+        now = time.time()
+        recent = [t for t in self.hits.get(key, []) if now - t < self.window]
+        if recent:
+            self.hits[key] = recent
+        else:
+            self.hits.pop(key, None)
+        return len(recent)
+
+    def blocked(self, key: str) -> bool:
+        return self.count(key) >= self.limit
+
+    def add(self, key: str) -> None:
+        self.hits.setdefault(key, []).append(time.time())
+
+    def clear(self) -> None:
+        self.hits.clear()
 
 
 def login_required(request: Request, user: User | None = Depends(current_user_optional)) -> User:

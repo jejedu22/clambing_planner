@@ -2,6 +2,8 @@
 {% block title %}Utilisateurs — Climbing Planner{% endblock %}
 {% block content %}
 <h1>Utilisateurs</h1>
+{% if invited %}<div class="flash ok">Invitation envoyée à <code>{{ invited }}</code> : la personne choisira son mot de passe via le lien reçu (valable 7 jours).</div>{% endif %}
+{% if invite_error %}<div class="flash error">L'invitation n'a pas pu être envoyée ({{ invite_error }}). Transmettez le mot de passe provisoire ci-dessous.</div>{% endif %}
 {% if credentials %}
 <div class="flash ok">
   <strong>Identifiants à transmettre (affichés une seule fois)</strong><br>
@@ -12,34 +14,58 @@
 <form method="post" action="/admin/users" class="card">
   <h3>Ajouter un utilisateur</h3>
   <input type="hidden" name="csrf" value="{{ csrf }}">
-  <label>Nom <input name="name" required maxlength="120"></label>
+  <div class="two-cols">
+    <label>Prénom <input name="first_name" maxlength="55" autocomplete="off"></label>
+    <label>Nom <input name="last_name" maxlength="55" autocomplete="off"></label>
+  </div>
   <label>Email <input type="email" name="email" required></label>
+  <label>Téléphone <small class="muted">(facultatif)</small> <input type="tel" name="phone" maxlength="32" placeholder="06 12 34 56 78 ou +33 6 12 34 56 78"></label>
   <label>Rôle <select name="role">{% for k, v in roles.items() %}<option value="{{ k }}" {{ 'selected' if k == 'member' }}>{{ v }}</option>{% endfor %}</select></label>
   {% if user.is_super %}
   <label>Club (ignoré pour un super administrateur)
     <select name="club_id"><option value="">—</option>{% for c in clubs %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></label>
   {% endif %}
   <label>Mot de passe provisoire (vide = généré) <input name="password" autocomplete="off"></label>
+  {% if mail_ok or user.is_super %}<label class="inline"><input type="checkbox" name="invite" value="1" checked> Inviter par email (si Mailjet est configuré pour le club) : la personne choisit son mot de passe</label>{% endif %}
   <button>Créer</button>
 </form>
-<table>
-  <tr><th>Nom</th><th>Email</th>{% if user.is_super %}<th>Club</th>{% endif %}<th>Rôle</th><th>Actif</th><th></th></tr>
+<div class="actions" style="margin:1rem 0">
+  <a class="btn" href="/admin/users/import">⬆️ Importer (CSV)</a>
+  <a class="btn" href="/admin/users/export?q={{ q | urlencode }}{{ '&club=' ~ club_filter if club_filter }}">⬇️ Exporter (CSV)</a>
+</div>
+<form class="filters" method="get" action="/admin/users">
+  <input type="search" name="q" value="{{ q }}" placeholder="Rechercher (nom, email, téléphone)…">
+  {% if clubs %}<select name="club"><option value="">Tous les clubs</option>
+    {% for c in clubs %}<option value="{{ c.id }}" {{ 'selected' if club_filter == c.id }}>{{ c.name }}</option>{% endfor %}</select>{% endif %}
+  <button>Filtrer</button>
+</form>
+<p class="muted">{{ total }} utilisateur(s)</p>
+<div class="table-wrap"><table>
+  <tr><th>Nom</th><th>Email</th><th>Téléphone</th>{% if user.is_super %}<th>Club</th>{% endif %}<th>Rôle</th><th>Cotisation</th><th>Actif</th><th></th></tr>
   {% for u in users %}
   <tr class="{{ 'cancelled' if not u.is_active }}">
-    <td>{{ u.name }}{% if manageable[u.id] %}<form id="f{{ u.id }}" method="post" action="/admin/users/{{ u.id }}"><input type="hidden" name="csrf" value="{{ csrf }}"></form>{% endif %}</td><td>{{ u.email }}</td>
+    <td>{{ u.last_name or '' }} {{ u.first_name or '' }}{% if not (u.last_name or u.first_name) %}{{ u.name }}{% endif %}{% if manageable[u.id] %}<form id="f{{ u.id }}" method="post" action="/admin/users/{{ u.id }}"><input type="hidden" name="csrf" value="{{ csrf }}"></form>{% endif %}</td><td>{{ u.email }}</td><td class="nowrap">{{ u.phone | phone }}</td>
     {% if user.is_super %}<td>{{ club_names.get(u.club_id, '—') }}</td>{% endif %}
     {% if manageable[u.id] %}
     <td>{% if u.is_super %}{{ u.role_label }}<input form="f{{ u.id }}" type="hidden" name="role" value="super_admin">
         {% else %}<select form="f{{ u.id }}" name="role">
         <option value="member" {{ 'selected' if u.role == 'member' }}>Membre</option>
         <option value="club_admin" {{ 'selected' if u.role == 'club_admin' }}>Administrateur du club</option></select>{% endif %}</td>
+    <td>{% if u.email in dues %}{{ '✅' if dues[u.email] else '⚠️ expirée' }}{% else %}<span class="muted">—</span>{% endif %}</td>
     <td><input form="f{{ u.id }}" type="checkbox" name="active" value="1" {{ 'checked' if u.is_active }}></td>
     <td><div class="actions"><button form="f{{ u.id }}">Enregistrer</button>
+      <a class="btn" href="/admin/users/{{ u.id }}/edit">Modifier</a>
       <form method="post" action="/admin/users/{{ u.id }}/reset" onsubmit="return confirm('Générer un nouveau mot de passe provisoire ?')"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Réinit. mot de passe</button></form></div></td>
     {% else %}
-    <td>{{ u.role_label }}</td><td>{{ '✔' if u.is_active else '✘' }}</td><td></td>
+    <td>{{ u.role_label }}</td><td>{% if u.email in dues %}{{ '✅' if dues[u.email] else '⚠️ expirée' }}{% else %}<span class="muted">—</span>{% endif %}</td><td>{{ '✔' if u.is_active else '✘' }}</td><td></td>
     {% endif %}
   </tr>
   {% endfor %}
-</table>
+</table></div>
+{% if pages > 1 %}
+<p class="pager">{% set qs = 'q=' ~ (q | urlencode) ~ ('&club=' ~ club_filter if club_filter else '') %}
+  {% if page > 1 %}<a href="/admin/users?{{ qs }}&page={{ page - 1 }}">← Précédent</a>{% endif %}
+  Page {{ page }} / {{ pages }}
+  {% if page < pages %}<a href="/admin/users?{{ qs }}&page={{ page + 1 }}">Suivant →</a>{% endif %}</p>
+{% endif %}
 {% endblock %}

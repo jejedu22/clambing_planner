@@ -1,0 +1,11 @@
+{% macro picker(clubs, club, action) %}
+{% if user.is_super %}
+<form class="filters" method="get" action="{{ action }}">
+  <select name="club" onchange="this.form.submit()">
+    <option value="">— Choisir un club —</option>
+    {% for c in clubs %}<option value="{{ c.id }}" {{ 'selected' if club and club.id == c.id }}>{{ c.name }}</option>{% endfor %}
+  </select>
+</form>
+{% endif %}
+{% endmacro %}
+{% macro hidden(club) %}{% if user.is_super and club %}<input type="hidden" name="club_id" value="{{ club.id }}">{% endif %}{% endmacro %}

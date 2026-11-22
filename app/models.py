@@ -279,3 +279,17 @@ class AuditLog(Base):
     target: Mapped[str | None] = mapped_column(String(200), nullable=True)
     detail: Mapped[str | None] = mapped_column(String(500), nullable=True)
     ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
+class ClubFavorite(Base):
+    """Site favori d'un club (avec une note facultative visible des membres du club)."""
+
+    __tablename__ = "club_favorites"
+
+    club_id: Mapped[int] = mapped_column(ForeignKey("clubs.id"), primary_key=True)
+    site_id: Mapped[int] = mapped_column(ForeignKey("sites.id"), primary_key=True)
+    note: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    added_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    site: Mapped[Site] = relationship()

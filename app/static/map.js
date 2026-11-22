@@ -26,15 +26,16 @@
     var b = map.getBounds();
     var qs = new URLSearchParams({
       bbox: [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()].join(','),
-      kind: el.dataset.kind || '', outdoor: el.dataset.outdoor || '0', q: el.dataset.q || '', limit: 400
+      kind: el.dataset.kind || '', outdoor: el.dataset.outdoor || '0', q: el.dataset.q || '', fav: el.dataset.fav || '0', limit: 400
     });
     fetch('/api/sites?' + qs, { credentials: 'same-origin' })
       .then(function (r) { return r.json(); })
       .then(function (data) {
         layer.clearLayers();
         data.sites.forEach(function (s) {
-          L.marker([s.lat, s.lon]).addTo(layer).bindPopup(
-            '<a href="/sites/' + s.id + '">' + esc(s.name) + '</a><br>' + esc(s.types.join(', ')));
+          var opts = s.fav ? { icon: L.divIcon({ className: 'star-icon', html: '⭐', iconSize: [22, 22], iconAnchor: [11, 11] }) } : {};
+          L.marker([s.lat, s.lon], opts).addTo(layer).bindPopup(
+            '<a href="/sites/' + s.id + '">' + (s.fav ? '⭐ ' : '') + esc(s.name) + '</a><br>' + esc(s.types.join(', ')));
         });
         note.textContent = data.truncated
           ? 'Trop de sites dans cette zone : zoomez pour tous les voir.'

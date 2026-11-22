@@ -10,23 +10,30 @@
     {% for code, label in type_labels.items() %}<option value="{{ code }}" {{ 'selected' if kind == code }}>{{ label }}</option>{% endfor %}
   </select>
   <label class="inline"><input type="checkbox" name="outdoor" value="1" {{ 'checked' if outdoor }}> Extérieur seulement</label>
+  {% if user.club_id %}<label class="inline"><input type="checkbox" name="fav" value="1" {{ 'checked' if fav }}> ⭐ Favoris du club</label>{% endif %}
   <button>Filtrer</button>
 </form>
 {% if total == 0 and not q %}
   <p class="muted">Aucun site pour l'instant.{% if user.is_super %} <a href="/admin/sites">Lancer l'import</a>.{% endif %}</p>
 {% endif %}
-<div id="map" data-kind="{{ kind }}" data-outdoor="{{ outdoor }}" data-q="{{ q }}"></div>
+<div id="map" data-kind="{{ kind }}" data-outdoor="{{ outdoor }}" data-q="{{ q }}" data-fav="{{ fav }}"></div>
 <p id="map-note" class="muted"></p>
 <ul class="list">
 {% for s in rows %}
-  <li><a href="/sites/{{ s.id }}">{{ s.display_name }}</a>
+  <li>{% if s.id in fav_ids %}<span title="Favori du club">⭐</span> {% endif %}<a href="/sites/{{ s.id }}">{{ s.display_name }}</a>
     {% for t in s.type_labels %}<span class="tag">{{ t }}</span>{% endfor %}
-    {% if not s.outdoor %}<span class="tag">Salle</span>{% endif %}</li>
+    {% if not s.outdoor %}<span class="tag">Salle</span>{% endif %}
+    {% if user.club_id and user.is_admin %}
+    <form method="post" action="/sites/{{ s.id }}/{{ 'unfavorite' if s.id in fav_ids else 'favorite' }}" class="inline-fav">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="next" value="{{ request.url.path }}{{ '?' ~ request.url.query if request.url.query }}">
+      <button class="link" title="{{ 'Retirer des favoris' if s.id in fav_ids else 'Ajouter aux favoris' }}">{{ '★ Retirer' if s.id in fav_ids else '☆ Favori' }}</button>
+    </form>{% endif %}</li>
 {% endfor %}
 </ul>
 {% if pages > 1 %}
 <p class="pager">
-  {% set qs = 'q=' ~ (q | urlencode) ~ '&kind=' ~ kind ~ '&outdoor=' ~ outdoor %}
+  {% set qs = 'q=' ~ (q | urlencode) ~ '&kind=' ~ kind ~ '&outdoor=' ~ outdoor ~ '&fav=' ~ fav %}
   {% if page > 1 %}<a href="/sites?{{ qs }}&page={{ page - 1 }}">← Précédent</a>{% endif %}
   Page {{ page }} / {{ pages }}
   {% if page < pages %}<a href="/sites?{{ qs }}&page={{ page + 1 }}">Suivant →</a>{% endif %}

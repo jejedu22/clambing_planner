@@ -33,6 +33,10 @@ L'application est servie sur `https://$APP_HOST` (routeur `climbing`, entrypoint
 
 Sauvegarde : volume Docker `pgdata` (`docker compose exec db pg_dump -U climbing climbing > backup.sql`).
 
+## Sites favoris par club
+
+Chaque club garde sa propre liste de sites favoris, avec une **note** facultative visible de ses membres (parking, accès, difficulté…). Les administrateurs de club les gèrent (bouton ☆/★ dans la liste des sites ou sur la fiche d'un site) ; les membres les consultent sur la page **⭐ Favoris**. Un club ne voit jamais les favoris ni les notes d'un autre club. Les favoris apparaissent avec une ⭐ dans la liste et sur la carte, se filtrent (*Favoris du club*) et sont proposés en premier quand on choisit le site d'une sortie. Le super administrateur gère les favoris de n'importe quel club depuis la fiche d'un site ou la page Favoris. Limite : 500 favoris par club.
+
 ## Gestion des utilisateurs
 
 - **Fiche** : prénom, nom, email (identifiant de connexion), téléphone (facultatif, normalisé au format international : `06 12 34 56 78` devient `+33612345678`), rôle, actif. Chacun modifie son prénom/nom/téléphone dans *Mon compte* ; l'email et le rôle ne se changent que par un administrateur (qui invalide alors les liens de réinitialisation en attente). Liste avec recherche (nom, email, téléphone) et pagination.

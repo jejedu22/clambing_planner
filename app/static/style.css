@@ -49,3 +49,4 @@ td select{margin:0}tr.cancelled td{opacity:.55}
 .two-cols{display:grid;grid-template-columns:1fr 1fr;gap:.8rem}@media (max-width:640px){.two-cols{grid-template-columns:1fr}}
 textarea[hidden]{display:none}
 .nowrap{white-space:nowrap}
+.inline-fav{display:inline;margin:0 0 0 .4rem}.inline-fav button{padding:0;font-size:.85rem}.star-icon{font-size:20px;line-height:1;text-shadow:0 0 3px #fff}

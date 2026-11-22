@@ -1,4 +1,4 @@
-# Clambing Planner
+# Climbing Planner
 
 Outil de planification de sorties d'escalade pour les clubs.
 
@@ -24,7 +24,7 @@ cp .env.example .env     # renseigner APP_HOST, POSTGRES_PASSWORD, SECRET_KEY, S
 docker compose up -d --build
 ```
 
-L'application est servie sur `https://$APP_HOST` (routeur `clambing`, entrypoint `websecure`, certificat Let's Encrypt, middleware `default@file`). La base PostgreSQL est sur un réseau interne, jamais exposée.
+L'application est servie sur `https://$APP_HOST` (routeur `climbing`, entrypoint `websecure`, certificat Let's Encrypt, middleware `default@file`). La base PostgreSQL est sur un réseau interne, jamais exposée.
 
 1. Connectez-vous avec `SUPERADMIN_EMAIL` / `SUPERADMIN_PASSWORD` (créé au premier démarrage si aucun super administrateur n'existe), puis retirez ces variables du `.env`.
 2. **Import** → *Lancer un import maintenant* pour charger les sites (quelques minutes). Il est ensuite relancé tout seul tous les `SITES_REFRESH_DAYS` jours (30 par défaut, 0 pour désactiver).

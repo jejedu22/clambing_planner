@@ -46,7 +46,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Clambing Planner",
+    title="Climbing Planner",
     lifespan=lifespan,
     dependencies=[Depends(verify_csrf)],
     docs_url=None, redoc_url=None, openapi_url=None,
@@ -54,7 +54,7 @@ app = FastAPI(
 app.add_middleware(
     SessionMiddleware,
     secret_key=settings.secret_key,
-    session_cookie="clambing_session",
+    session_cookie="climbing_session",
     max_age=14 * 24 * 3600,
     same_site="lax",
     https_only=settings.cookie_secure,

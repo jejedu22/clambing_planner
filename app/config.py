@@ -28,7 +28,7 @@ class Settings:
         ]
         self.weather_url = os.environ.get("WEATHER_URL", "https://api.open-meteo.com/v1/forecast")
         self.timezone = os.environ.get("TZ", "Europe/Paris")
-        self.user_agent = "clambing-planner/1.0"
+        self.user_agent = "climbing-planner/1.0"
 
 
 settings = Settings()

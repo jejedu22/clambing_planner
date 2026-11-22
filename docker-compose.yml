@@ -1,7 +1,7 @@
 services:
   app:
     build: .
-    container_name: clambing-app
+    container_name: climbing-app
     restart: unless-stopped
     mem_limit: 256m
     cpus: 0.5
@@ -20,15 +20,15 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=proxy
-      - traefik.http.routers.clambing.rule=Host(`${APP_HOST:?}`)
-      - traefik.http.routers.clambing.entrypoints=websecure
-      - traefik.http.routers.clambing.tls.certresolver=letsencrypt
-      - traefik.http.routers.clambing.middlewares=default@file
-      - traefik.http.services.clambing.loadbalancer.server.port=8000
+      - traefik.http.routers.climbing.rule=Host(`${APP_HOST:?}`)
+      - traefik.http.routers.climbing.entrypoints=websecure
+      - traefik.http.routers.climbing.tls.certresolver=letsencrypt
+      - traefik.http.routers.climbing.middlewares=default@file
+      - traefik.http.services.climbing.loadbalancer.server.port=8000
 
   db:
     image: postgres:16-alpine
-    container_name: clambing-db
+    container_name: climbing-db
     restart: unless-stopped
     mem_limit: 256m
     environment:

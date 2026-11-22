@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "_weather.html" import day_card %}
-{% block title %}{{ outing.title }} — Clambing Planner{% endblock %}
+{% block title %}{{ outing.title }} — Climbing Planner{% endblock %}
 {% block content %}
 <p><a href="/outings">← Sorties</a></p>
 <h1>{{ outing.title }} {% if outing.cancelled %}<span class="tag">Annulée</span>{% endif %}</h1>

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ 'Modifier' if outing else 'Nouvelle' }} sortie — Clambing Planner{% endblock %}
+{% block title %}{{ 'Modifier' if outing else 'Nouvelle' }} sortie — Climbing Planner{% endblock %}
 {% block content %}
 {% set f = form or {} %}
 {% set cur_club = (f.club_id if f.club_id is defined else (outing.club_id if outing else '')) | string %}

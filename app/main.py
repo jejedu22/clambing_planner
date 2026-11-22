@@ -11,7 +11,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from .config import settings
 from .db import Base, SessionLocal, engine
 from .models import Role, User
-from .routes import admin, auth, dashboard, outings, sites
+from .routes import admin, auth, dashboard, outings, pwa, sites
 from .security import RedirectTo, hash_password, verify_csrf
 from .services import sites_import
 from .web import BASE, render
@@ -61,7 +61,7 @@ app.add_middleware(
 )
 app.mount("/static", StaticFiles(directory=BASE / "static"), name="static")
 
-for module in (auth, dashboard, sites, outings, admin):
+for module in (pwa, auth, dashboard, sites, outings, admin):
     app.include_router(module.router)
 
 

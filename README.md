@@ -33,6 +33,14 @@ L'application est servie sur `https://$APP_HOST` (routeur `climbing`, entrypoint
 
 Sauvegarde : volume Docker `pgdata` (`docker compose exec db pg_dump -U climbing climbing > backup.sql`).
 
+## Application installable (PWA)
+
+L'appli s'installe sur l'écran d'accueil : Chrome/Edge/Android proposent « Installer », sur iPhone via *Partager → Sur l'écran d'accueil*. Elle exige HTTPS, ce que Traefik fournit.
+
+- Les fichiers statiques (CSS, JS, icônes, carte) sont mis en cache pour un affichage rapide ; le cache se renouvelle seul à chaque déploiement.
+- **Les pages et données ne sont jamais mises en cache** (sorties, participants et météo restent privés, même sur un téléphone partagé) : sans réseau, une page « Hors connexion » s'affiche.
+- Fichiers : `/manifest.webmanifest`, `/sw.js` (servis à la racine, côté `app/routes/pwa.py`), icônes dans `app/static/icons/`.
+
 ## Développement
 
 ```bash

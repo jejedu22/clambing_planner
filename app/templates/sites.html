@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Sites d'escalade — Climbing Planner{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">{% endblock %}
+{% block content %}
+<h1>Sites d'escalade <small class="muted">({{ total }})</small></h1>
+<form class="filters" method="get" action="/sites">
+  <input type="search" name="q" value="{{ q }}" placeholder="Rechercher un site…">
+  <select name="kind">
+    <option value="">Tous types</option>
+    {% for code, label in type_labels.items() %}<option value="{{ code }}" {{ 'selected' if kind == code }}>{{ label }}</option>{% endfor %}
+  </select>
+  <label class="inline"><input type="checkbox" name="outdoor" value="1" {{ 'checked' if outdoor }}> Extérieur seulement</label>
+  <button>Filtrer</button>
+</form>
+{% if total == 0 and not q %}
+  <p class="muted">Aucun site pour l'instant.{% if user.is_super %} <a href="/admin/sites">Lancer l'import</a>.{% endif %}</p>
+{% endif %}
+<div id="map" data-kind="{{ kind }}" data-outdoor="{{ outdoor }}" data-q="{{ q }}"></div>
+<p id="map-note" class="muted"></p>
+<ul class="list">
+{% for s in rows %}
+  <li><a href="/sites/{{ s.id }}">{{ s.display_name }}</a>
+    {% for t in s.type_labels %}<span class="tag">{{ t }}</span>{% endfor %}
+    {% if not s.outdoor %}<span class="tag">Salle</span>{% endif %}</li>
+{% endfor %}
+</ul>
+{% if pages > 1 %}
+<p class="pager">
+  {% set qs = 'q=' ~ (q | urlencode) ~ '&kind=' ~ kind ~ '&outdoor=' ~ outdoor %}
+  {% if page > 1 %}<a href="/sites?{{ qs }}&page={{ page - 1 }}">← Précédent</a>{% endif %}
+  Page {{ page }} / {{ pages }}
+  {% if page < pages %}<a href="/sites?{{ qs }}&page={{ page + 1 }}">Suivant →</a>{% endif %}
+</p>
+{% endif %}
+<script src="/static/vendor/leaflet/leaflet.js"></script>
+<script src="/static/map.js"></script>
+{% endblock %}

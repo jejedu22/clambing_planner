@@ -1,0 +1,13 @@
+{% macro day_card(d) %}
+<div class="wday {{ d.verdict }}">
+  <div class="wd">{{ d.date | fr_date(true) }}</div>
+  <div class="wi">{{ d.icon }}</div>
+  <div class="wt">{{ d.tmax | round | int }}° <small>/ {{ d.tmin | round | int }}°</small></div>
+  <div class="wr">💧 {{ d.rain }} mm{% if d.rain_prob is not none %} · {{ d.rain_prob }}%{% endif %}</div>
+  <div class="ww">💨 {{ d.wind | round | int }} km/h</div>
+</div>
+{% endmacro %}
+
+{% macro badge(d) %}
+<span class="badge {{ d.verdict }}" title="{{ d.verdict_text }}">{{ d.icon }} {{ d.tmax | round | int }}°/{{ d.tmin | round | int }}° — {{ d.verdict_text }}</span>
+{% endmacro %}

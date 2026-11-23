@@ -19,6 +19,9 @@ COLUMNS = [
     ("users", "first_name", "VARCHAR(60)"),
     ("users", "last_name", "VARCHAR(60)"),
     ("users", "phone", "VARCHAR(32)"),
+    ("clubs", "home_lat", "FLOAT"),
+    ("clubs", "home_lon", "FLOAT"),
+    ("clubs", "home_label", "VARCHAR(80)"),
 ]
 
 

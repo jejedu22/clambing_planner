@@ -168,6 +168,7 @@ tr.cancelled td { opacity: .6; }
 code { background: var(--surface-2); padding: 0 .3rem; border-radius: 4px; }
 .inline-fav { display: inline; margin: 0 0 0 .4rem; }
 .inline-fav button { font-size: .85rem; }
+.home-icon { display: grid !important; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: var(--accent-fg); border: 2px solid var(--surface); box-shadow: var(--shadow); }
 .star-icon { font-size: 20px; line-height: 1; text-shadow: 0 0 3px #fff; }
 
 /* --- Carte et météo ------------------------------------------------------------------ */

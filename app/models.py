@@ -36,6 +36,14 @@ class Club(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(120), unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # Point de départ du club (local, gymnase…) : centre de la carte des sites
+    home_lat: Mapped[float | None] = mapped_column(Float, nullable=True)
+    home_lon: Mapped[float | None] = mapped_column(Float, nullable=True)
+    home_label: Mapped[str | None] = mapped_column(String(80), nullable=True)
+
+    @property
+    def has_home(self) -> bool:
+        return self.home_lat is not None and self.home_lon is not None
 
     users: Mapped[list[User]] = relationship(back_populates="club")
     outings: Mapped[list[Outing]] = relationship(back_populates="club")

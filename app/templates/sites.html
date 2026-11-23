@@ -16,7 +16,9 @@
 {% if total == 0 and not q %}
   <p class="muted">Aucun site pour l'instant.{% if user.is_super %} <a href="/admin/sites">Lancer l'import</a>.{% endif %}</p>
 {% endif %}
-<div id="map" data-kind="{{ kind }}" data-outdoor="{{ outdoor }}" data-q="{{ q }}" data-fav="{{ fav }}"></div>
+<div id="map" data-kind="{{ kind }}" data-outdoor="{{ outdoor }}" data-q="{{ q }}" data-fav="{{ fav }}"
+     data-view='{{ view | tojson }}'></div>
+{% if user.is_admin and user.club and not user.club.has_home %}<p class="muted">Astuce : <a href="/admin/club-location">indiquez la localisation du club</a> pour que la carte s'ouvre autour de chez vous.</p>{% endif %}
 <p id="map-note" class="muted"></p>
 <ul class="list">
 {% for s in rows %}

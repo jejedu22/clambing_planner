@@ -17,7 +17,7 @@ from .config import settings
 request_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("request_id", default="-")
 
 _STD = set(logging.LogRecord("", 0, "", 0, "", (), None).__dict__) | {"message", "asctime", "request_id"}
-_RESET_RE = re.compile(r"^(/reset/).+")
+_RESET_RE = re.compile(r"^(/reset/|/rejoindre/).+")
 
 
 class ContextFilter(logging.Filter):
@@ -81,7 +81,7 @@ def setup_logging() -> None:
 
 
 def safe_path(path: str) -> str:
-    """Chemin sans secret : le jeton des liens /reset/<jeton> n'est jamais journalisé."""
+    """Chemin sans secret : le jeton des liens /reset/<jeton> et /rejoindre/<jeton> n'est jamais journalisé."""
     return _RESET_RE.sub(r"\1[masqué]", path)
 
 

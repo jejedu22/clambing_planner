@@ -183,7 +183,11 @@ def _users_context(db: Session, actor: User, q: str = "", club: int | None = Non
     names = {c.id: c.name for c in db.scalars(select(Club))}
     roles = ROLE_LABELS if actor.is_super else {k: v for k, v in ROLE_LABELS.items()
                                                 if k != Role.SUPER_ADMIN.value}
+    pending_q = select(User).where(User.pending.is_(True)).order_by(User.created_at)
+    if not actor.is_super:
+        pending_q = pending_q.where(User.club_id == actor.club_id)
     return dict(users=users, clubs=clubs, club_names=names, roles=roles, dues=dues_for(db, [u.club_id for u in users]),
+                pending_users=db.scalars(pending_q).all(),
                 manageable={u.id: _manageable(actor, u) for u in users},
                 mail_ok=bool(actor.club_id and mailer.load_config(db, actor.club_id)),
                 q=q.strip()[:100], club_filter=club, total=total, page=page, pages=max(1, -(-total // PAGE)), **extra)
@@ -261,6 +265,8 @@ def user_update(user_id: int, request: Request, role: str = Form(...), active: s
     if role in (Role.CLUB_ADMIN.value, Role.MEMBER.value) and not target.is_super:
         target.role = role
     target.is_active = active == "1"
+    if target.is_active:
+        target.pending = False          # activer à la main vaut validation de l'inscription
     db.commit()
     audit("user.updated", request, club_id=target.club_id, target=f"user:{target.id}",
           detail=f"role={target.role} active={target.is_active}")

@@ -64,6 +64,8 @@ class User(Base):
     # Un super administrateur n'appartient à aucun club
     club_id: Mapped[int | None] = mapped_column(ForeignKey("clubs.id"), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Inscrit par un lien d'inscription, en attente de validation par un administrateur du club
+    pending: Mapped[bool | None] = mapped_column(Boolean, default=False, nullable=True)
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
@@ -327,3 +329,37 @@ class ClubRequest(Base):
     @property
     def contact_name(self) -> str:
         return f"{self.first_name} {self.last_name}".strip()
+
+
+
+class SignupLink(Base):
+    """Lien d'inscription d'un club, à partager. Le jeton est stocké haché (recherche) et chiffré
+    (pour que les administrateurs puissent le recopier) ; jamais en clair."""
+
+    __tablename__ = "signup_links"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    club_id: Mapped[int] = mapped_column(ForeignKey("clubs.id"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    token_enc: Mapped[str] = mapped_column(Text)
+    label: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    requires_approval: Mapped[bool] = mapped_column(Boolean, default=True)
+    max_uses: Mapped[int | None] = mapped_column(Integer, nullable=True)   # None = illimité
+    uses: Mapped[int] = mapped_column(Integer, default=0)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    club: Mapped[Club] = relationship()
+
+    def state(self, now: datetime) -> str:
+        """active | revoked | expired | full"""
+        exp = self.expires_at if self.expires_at.tzinfo else self.expires_at.replace(tzinfo=timezone.utc)
+        if self.revoked_at is not None:
+            return "revoked"
+        if exp <= now:
+            return "expired"
+        if self.max_uses is not None and self.uses >= self.max_uses:
+            return "full"
+        return "active"

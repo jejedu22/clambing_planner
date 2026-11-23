@@ -39,6 +39,14 @@ Sauvegarde : volume Docker `pgdata` (`docker compose exec db pg_dump -U climbing
 - **`/creer-un-club`** : formulaire public de demande (nom et ville du club, responsable, email, téléphone et effectif facultatifs, message, consentement). Protégé par jeton CSRF, champ piège anti-robots et limites (3 demandes par heure et par IP, 2 par jour et par adresse) ; une seule demande en cours par adresse ; un nom de club existant est refusé. Les super administrateurs sont prévenus par email (SMTP), sans les coordonnées du demandeur.
 - **Gestion des demandes** (*Club → Demandes de clubs*, super administrateur) : liste par statut, fiche détaillée avec alertes (nom de club pris, email ayant déjà un compte). **Accepter** crée le club (nom modifiable) et le compte administrateur du demandeur, qui reçoit par SMTP un lien d'activation valable 7 jours (sans SMTP : mot de passe provisoire affiché). **Refuser** avec un motif facultatif, envoyé au demandeur si souhaité. **Supprimer** efface la demande et les données du demandeur. Tout est tracé dans le journal d'audit.
 
+## Inscription des membres par lien sécurisé
+
+L'inscription à un club **n'est pas publique**. Un administrateur crée un lien d'inscription (*Membres → Liens d'inscription*) et le partage en privé (email, groupe du club). Pour chaque lien, il choisit :
+- sa durée de validité (7 jours, 30 jours, 3 mois ou 1 an) et un nombre maximal d'inscriptions (facultatif) ;
+- la **validation des inscriptions** (activée par défaut) : les nouveaux comptes restent en attente jusqu'à ce qu'un administrateur les valide ou les refuse depuis *Membres* (les administrateurs sont prévenus par email). Sans validation, la personne est connectée tout de suite.
+
+Sécurité : jeton aléatoire de 192 bits, stocké haché (recherche) et chiffré (pour pouvoir recopier le lien), jamais journalisé ; lien révocable à tout moment ; limite d'utilisations appliquée par la base ; page `/rejoindre/…` non indexée et sans transmission du lien en *referer* ; CSRF, champ piège anti-robots et 5 inscriptions par heure et par IP. Un lien expiré, complet ou révoqué affiche simplement « Lien non valable ».
+
 ## Clubs (super administrateur)
 
 *Club → Clubs* liste les clubs. **Modifier** ouvre la fiche d'un club : renommage (nom unique, casse ignorée, tracé dans le journal d'audit), résumé (membres, administrateurs, sorties, favoris, localisation, intégrations) et accès directs à ses membres, sa localisation, ses favoris, ses intégrations, ses adhésions et son journal. Un club sans membres ni sorties peut être supprimé.

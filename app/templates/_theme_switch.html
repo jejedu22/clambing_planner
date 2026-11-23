@@ -1,0 +1,9 @@
+<form method="post" action="/theme" class="theme-form">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <input type="hidden" name="next" value="{{ request.url.path }}{{ '?' ~ request.url.query if request.url.query }}">
+  <div class="theme-switch" role="group" aria-label="Thème">
+    <button name="theme" value="auto" aria-pressed="{{ 'true' if theme not in ('light', 'dark') else 'false' }}" title="Suit le réglage de l'appareil">Auto</button>
+    <button name="theme" value="light" aria-pressed="{{ 'true' if theme == 'light' else 'false' }}">Clair</button>
+    <button name="theme" value="dark" aria-pressed="{{ 'true' if theme == 'dark' else 'false' }}">Sombre</button>
+  </div>
+</form>

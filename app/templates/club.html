@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Club — Climbing Planner{% endblock %}
+{% block content %}
+<div class="page-head"><h1>{{ user.club.name if user.club else 'Administration' }}</h1></div>
+
+<h2>Mon compte</h2>
+<div class="hub">
+  <a href="/password">Mon profil<span>Nom, téléphone, mot de passe, notifications</span></a>
+  <a href="/sites/favorites">Favoris du club<span>Les sites retenus pour les sorties</span></a>
+  <a href="/outings">Toutes les sorties<span>À venir et passées</span></a>
+</div>
+<div class="card" style="margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 1rem; align-items: center">
+  <strong>Thème</strong>{% include "_theme_switch.html" %}
+  <form method="post" action="/logout" style="margin-left: auto"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="secondary">Se déconnecter</button></form>
+</div>
+
+{% if user.is_admin %}
+<h2>Administration du club</h2>
+<div class="hub">
+  <a href="/admin/users">Membres<span>Comptes, rôles, import et export</span></a>
+  <a href="/admin/memberships">Adhésions{% if todo and todo.expired %}<span>{{ todo.expired }} expirée(s) à relancer</span>{% else %}<span>Synchronisation HelloAsso</span>{% endif %}</a>
+  <a href="/admin/integrations">Intégrations<span>Mailjet, HelloAsso</span></a>
+  <a href="/admin/logs">Journal<span>Connexions et actions sensibles</span></a>
+</div>
+{% endif %}
+
+{% if user.is_super %}
+<h2>Super administration</h2>
+<div class="hub">
+  <a href="/admin/clubs">Clubs<span>Créer, supprimer</span></a>
+  <a href="/admin/sites">Import des sites<span>OpenStreetMap</span></a>
+</div>
+{% endif %}
+{% endblock %}

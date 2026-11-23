@@ -1,46 +1,80 @@
+{%- set path = request.url.path -%}
+{%- macro current(prefix, exact=false) -%}{% set p = request.url.path %}{% if (exact and p == prefix) or (not exact and p.startswith(prefix)) %} aria-current="page"{% endif %}{%- endmacro -%}
 <!doctype html>
-<html lang="fr">
+<html lang="fr"{% if theme in ('light', 'dark') %} data-theme="{{ theme }}"{% endif %}>
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>{% block title %}Climbing Planner{% endblock %}</title>
   <link rel="manifest" href="/manifest.webmanifest">
-  <meta name="theme-color" content="#c2540a">
+  {% if theme == 'dark' %}<meta name="theme-color" content="#171E2D">
+  {% elif theme == 'light' %}<meta name="theme-color" content="#FFFFFF">
+  {% else %}<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#171E2D" media="(prefers-color-scheme: dark)">{% endif %}
+  <meta name="color-scheme" content="{{ 'dark' if theme == 'dark' else 'light' if theme == 'light' else 'light dark' }}">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Climbing">
   <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+  <link rel="preload" href="/static/fonts/manrope-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/static/style.css">
   {% block head %}{% endblock %}
 </head>
 <body>
-<header class="top">
-  <a class="brand" href="/">🧗 Climbing Planner</a>
+<a class="skip" href="#contenu">Aller au contenu</a>
+<header class="app-header">
+  <a class="brand" href="/" aria-label="Climbing Planner, agenda">
+    <span class="brand-mark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20 10 6l4 7 3-4 4 11Z"/></svg></span>
+    <span class="brand-name">Climbing Planner</span>
+  </a>
   {% if user %}
-  <nav>
-    <a href="/">Accueil</a>
-    <a href="/outings">Sorties</a>
-    <a href="/sites">Sites</a>
-    <a href="/sites/favorites">⭐ Favoris</a>
-    {% if user.is_admin %}<a href="/admin/users">Utilisateurs</a><a href="/admin/memberships">Adhésions</a><a href="/admin/integrations">Intégrations</a><a href="/admin/logs">Journal</a>{% endif %}
-    {% if user.is_super %}<a href="/admin/clubs">Clubs</a><a href="/admin/sites">Import</a>{% endif %}
+  <nav class="main-nav" aria-label="Navigation principale">
+    <a href="/"{{ current('/', true) }}{{ current('/outings') }}>Agenda</a>
+    <a href="/sites"{% if path.startswith('/sites') and not path.startswith('/sites/favorites') %} aria-current="page"{% endif %}>Sites</a>
+    <a href="/sites/favorites"{{ current('/sites/favorites') }}>Favoris</a>
+    {% if user.is_admin %}<a href="/admin/users"{{ current('/admin/users') }}>Membres</a>
+    <a href="/club"{{ current('/club') }}{% if path.startswith('/admin/') and not path.startswith('/admin/users') %} aria-current="page"{% endif %}>Club</a>{% endif %}
   </nav>
-  <div class="who">
-    <a href="/password" title="{{ user.role_label }}">{{ user.name }}</a>
-    <form method="post" action="/logout"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link">Déconnexion</button></form>
+  <div class="header-end">
+    {% if user.club %}<span class="club-name">{{ user.club.name }}</span>{% endif %}
+    <details class="account">
+      <summary aria-label="Mon compte"><span class="avatar">{{ ((user.first_name or user.name or '?')[:1] ~ (user.last_name or '')[:1]) | upper }}</span></summary>
+      <div class="account-menu">
+        <div class="who"><strong>{{ user.name }}</strong><br><span class="muted">{{ user.role_label }}</span></div>
+        <a href="/password">Mon compte</a>
+        <a href="/club">{{ 'Club et administration' if user.is_admin else 'Mon club' }}</a>
+        {% include "_theme_switch.html" %}
+        <form method="post" action="/logout"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="menu-button">Se déconnecter</button></form>
+      </div>
+    </details>
   </div>
   {% endif %}
 </header>
-<main>
-  {% for cat, msg in flashes %}<div class="flash {{ cat }}">{{ msg }}</div>{% endfor %}
-  {% if error %}<div class="flash error">{{ error }}</div>{% endif %}
+
+<main id="contenu">
+  {% for cat, msg in flashes %}<div class="flash {{ cat }}" role="{{ 'alert' if cat == 'error' else 'status' }}">{{ msg }}</div>{% endfor %}
+  {% if error %}<div class="flash error" role="alert">{{ error }}</div>{% endif %}
   {% block content %}{% endblock %}
 </main>
+
 <footer>
-  Sites : © contributeurs <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> (ODbL) ·
-  Météo : <a href="https://open-meteo.com/">Open-Meteo</a>
+  {% if not user %}{% include "_theme_switch.html" %}{% endif %}
+  <span>Sites : © contributeurs <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> (ODbL) · Météo : <a href="https://open-meteo.com/">Open-Meteo</a></span>
 </footer>
+
+{% if user %}
+<nav class="tabbar" aria-label="Navigation mobile">
+  <a href="/"{{ current('/', true) }}{{ current('/outings') }}>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>Agenda</a>
+  <a href="/sites"{% if path.startswith('/sites') and not path.startswith('/sites/favorites') %} aria-current="page"{% endif %}>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12Z"/><circle cx="12" cy="9" r="2.5"/></svg>Sites</a>
+  <a href="/sites/favorites"{{ current('/sites/favorites') }}>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9Z"/></svg>Favoris</a>
+  <a href="/club"{{ current('/club') }}{{ current('/admin') }}{{ current('/password') }}>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-4-6"/></svg>{{ 'Club' if user.is_admin else 'Moi' }}</a>
+</nav>
+{% endif %}
 <script src="/static/pwa.js"></script>
 </body>
 </html>

@@ -10,7 +10,8 @@ from ..logging_setup import mask_email
 from ..models import User, UserPref
 from ..security import Throttle, hash_password, login_required, password_error
 from ..services import notifications, tokens
-from ..web import flash, render
+from ..config import settings
+from ..web import THEMES, flash, render
 
 router = APIRouter()
 forgot_by_email = Throttle(limit=3, window=3600)
@@ -89,3 +90,16 @@ def notifications_pref(request: Request, notify: str = Form(""), user: User = De
     audit("account.notifications", request, target=f"user:{user.id}", detail="on" if pref.notify_email else "off")
     flash(request, "Préférences enregistrées.", "ok")
     return RedirectResponse("/password", status_code=303)
+
+
+@router.post("/theme")
+def set_theme(theme: str = Form("auto"), next: str = Form("")):
+    """Thème mémorisé sur l'appareil (cookie) ; accessible aussi sans être connecté."""
+    from .favorites import safe_next
+    response = RedirectResponse(safe_next(next, "/"), status_code=303)
+    if theme in THEMES and theme != "auto":
+        response.set_cookie("theme", theme, max_age=365 * 24 * 3600, samesite="lax",
+                            secure=settings.cookie_secure, httponly=True)
+    else:
+        response.delete_cookie("theme")
+    return response

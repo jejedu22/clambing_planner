@@ -33,6 +33,13 @@ L'application est servie sur `https://$APP_HOST` (routeur `climbing`, entrypoint
 
 Sauvegarde : volume Docker `pgdata` (`docker compose exec db pg_dump -U climbing climbing > backup.sql`).
 
+## Interface
+
+- **Agenda** (accueil) : la semaine en tête (sorties du jour et météo du site), puis les sorties à venir avec la réponse **Je viens / Peut-être / Non** et les places de covoiturage directement depuis la liste. Colonne de droite : sorties en attente de réponse, covoiturage de la prochaine sortie et, pour les administrateurs, ce qui reste à faire pour le club.
+- **PC** : onglets en haut (Agenda, Sites, Favoris, Membres, Club). **Mobile** : barre d'onglets en bas, réponses en gros boutons, tableaux affichés en fiches. La page **Club** regroupe le compte et l'administration.
+- **Thème** : Automatique (suit le réglage de l'appareil), Clair ou Sombre, depuis le menu du compte, la page Club ou le bas de la page de connexion. Le choix est mémorisé sur l'appareil (cookie). La carte s'assombrit aussi en thème sombre.
+- Police Manrope (licence OFL) servie par l'application : aucun appel à un service de polices externe.
+
 ## Sites favoris par club
 
 Chaque club garde sa propre liste de sites favoris, avec une **note** facultative visible de ses membres (parking, accès, difficulté…). Les administrateurs de club les gèrent (bouton ☆/★ dans la liste des sites ou sur la fiche d'un site) ; les membres les consultent sur la page **⭐ Favoris**. Un club ne voit jamais les favoris ni les notes d'un autre club. Les favoris apparaissent avec une ⭐ dans la liste et sur la carte, se filtrent (*Favoris du club*) et sont proposés en premier quand on choisit le site d'une sortie. Le super administrateur gère les favoris de n'importe quel club depuis la fiche d'un site ou la page Favoris. Limite : 500 favoris par club.

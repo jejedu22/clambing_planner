@@ -1,21 +1,106 @@
 {% extends "base.html" %}
-{% from "_weather.html" import badge %}
+{% block title %}Agenda — Climbing Planner{% endblock %}
 {% block content %}
-<h1>Prochaines sorties</h1>
-{% if user.is_admin %}<p><a class="btn" href="/outings/new">+ Nouvelle sortie</a></p>{% endif %}
-{% if not outings %}
-  <p class="muted">Aucune sortie à venir{% if not user.is_super and not user.club_id %}.{% endif %}</p>
-{% endif %}
-<div class="grid">
-{% for o in outings %}
-  <a class="card outing" href="/outings/{{ o.id }}">
-    <div class="date">{{ o.day | fr_date }}{% if o.meeting_time %} · {{ o.meeting_time | fr_time }}{% endif %}</div>
-    <h3>{{ o.title }}</h3>
-    <div>📍 {{ o.site.display_name }}{% if user.is_super %} · <em>{{ o.club.name }}</em>{% endif %}</div>
-    {% set f = forecasts[o.id] %}
-    {% if f %}{{ badge(f) }}{% else %}<span class="muted">Météo disponible 16 jours avant la sortie</span>{% endif %}
-    <div class="muted">{{ o.participations | selectattr('status','equalto','yes') | list | length }} inscrit(s){% if mine.get(o.id) %} · vous : {{ {'yes':'✅','maybe':'🤔','no':'❌'}[mine[o.id]] }}{% endif %}</div>
-  </a>
-{% endfor %}
+<div class="page-head">
+  <h1>{{ title }}</h1>
+  <div class="actions" aria-label="Changer de semaine">
+    <a class="btn secondary" href="/?week={{ prev_week }}" aria-label="Semaine précédente">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></a>
+    <a class="btn secondary" href="/?week={{ next_week }}" aria-label="Semaine suivante">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a>
+    {% if not this_week %}<a class="btn secondary" href="/">Aujourd'hui</a>{% endif %}
+  </div>
+  <div class="end">
+    <nav class="segmented" aria-label="Affichage">
+      <a href="/" aria-current="page">Semaine</a>
+      <a href="/outings">Liste</a>
+    </nav>
+    {% if user.is_admin %}<a class="btn" href="/outings/new">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Nouvelle<span class="hide-mobile">&nbsp;sortie</span></a>{% endif %}
+  </div>
+</div>
+
+<div class="week" role="list" aria-label="Jours de la semaine">
+  {% for d in days %}
+  <div class="day{{ ' today' if d.today }}{{ ' past' if d.past and not d.today }}" role="listitem">
+    <span class="day-name">{{ d.label }}{% if d.today %}<span class="sr-only"> (aujourd'hui)</span>{% endif %}</span>
+    <span class="day-num">{{ d.num }}</span>
+    {% set first = d.outings[0] if d.outings else none %}
+    {% if first and forecasts.get(first.id) %}{% set f = forecasts[first.id] %}
+      <span class="chip-weather verdict {{ f.verdict }}"><span class="dot {{ f.verdict }}" aria-hidden="true"></span><span class="label">{{ f.label if f.verdict == 'ok' else f.verdict_text.split(':')[0] | truncate(16, true, '…') }} · {{ f.tmax | round | int }}°</span></span>
+    {% endif %}
+    {% for o in d.outings %}
+      <a class="chip{{ ' cancelled' if o.cancelled }}" href="/outings/{{ o.id }}" title="{{ o.title }}">{{ o.meeting_time | fr_time ~ ' · ' if o.meeting_time }}{{ o.site.display_name }}</a>
+    {% endfor %}
+    {% if d.outings %}<span class="has-outing" aria-label="{{ d.outings | length }} sortie(s)"></span>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+<div class="agenda">
+  <section aria-labelledby="a-venir">
+    <h2 id="a-venir" style="margin-top: 0">À venir</h2>
+    {% for o in upcoming %}
+    {% set f = forecasts.get(o.id) %}{% set p = mine.get(o.id) %}{% set st = stats[o.id] %}
+    <article class="outing-card">
+      <div class="head">
+        <div>
+          <div class="when">{{ o.day | fr_date }}{% if o.meeting_time %} · {{ o.meeting_time | fr_time }}{% endif %}</div>
+          <h3><a href="/outings/{{ o.id }}">{{ o.title }}</a></h3>
+          <div class="muted">{{ o.site.display_name }}{% if o.meeting_point %} · {{ o.meeting_point }}{% endif %} ·
+            {{ st.yes }}{% if o.max_participants %} / {{ o.max_participants }}{% endif %} inscrit(s){% if st.seats %} · {{ st.seats }} place(s) en voiture{% endif %}
+            {% if user.is_super %} · {{ o.club.name }}{% endif %}</div>
+        </div>
+        {% if f %}<span class="badge {{ f.verdict }}">{{ f.verdict_text }}</span>
+        {% else %}<span class="badge neutral">Météo 16 jours avant</span>{% endif %}
+      </div>
+      {% if can_reply[o.id] %}
+      <form class="reply" method="post" action="/outings/{{ o.id }}/respond">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="next" value="/?week={{ week_param }}">
+        <div class="segmented" role="group" aria-label="Ma réponse pour {{ o.title }}">
+          <button class="yes" name="status" value="yes" aria-pressed="{{ 'true' if p and p.status == 'yes' else 'false' }}">Je viens</button>
+          <button name="status" value="maybe" aria-pressed="{{ 'true' if p and p.status == 'maybe' else 'false' }}">Peut-être</button>
+          <button name="status" value="no" aria-pressed="{{ 'true' if p and p.status == 'no' else 'false' }}">Non</button>
+        </div>
+        <label class="inline">Je propose
+          <select name="seats" aria-label="Places proposées en voiture">
+            {% for n in range(0, 7) %}<option value="{{ n }}" {{ 'selected' if p and p.seats == n }}>{{ n }} place{{ 's' if n > 1 }}</option>{% endfor %}
+          </select></label>
+        {% if not p %}<span class="verdict bad">Pas encore répondu</span>{% endif %}
+        <a href="/outings/{{ o.id }}" style="margin-left: auto; font-weight: 700">Détails</a>
+      </form>
+      {% endif %}
+    </article>
+    {% else %}
+    <div class="card"><p class="muted" style="margin: 0">Aucune sortie à venir.{% if user.is_admin %} <a href="/outings/new">Proposer une sortie</a>{% endif %}</p></div>
+    {% endfor %}
+  </section>
+
+  <aside class="agenda-side">
+    {% if pending %}
+    <section class="card" aria-labelledby="a-repondre">
+      <h2 id="a-repondre" style="margin-top: 0">À répondre</h2>
+      <p style="margin: 0"><span class="stat">{{ pending }}</span> <span class="muted">sortie(s) attendent votre réponse.</span></p>
+    </section>
+    {% endif %}
+    {% if next_outing %}{% set st = stats[next_outing.id] %}
+    <section class="card" aria-labelledby="covoit">
+      <h2 id="covoit" style="margin-top: 0">Covoiturage · {{ next_outing.day | fr_date(true) }}</h2>
+      {% if st.seats %}
+        <p style="margin: 0 0 .6rem"><span class="stat">{{ st.seats }}</span> <span class="muted">place(s) proposée(s) par {{ st.drivers }} conducteur(s) pour {{ st.yes }} inscrit(s)</span></p>
+        <div class="meter" aria-hidden="true"><span style="width: {{ [100, (st.seats / [st.yes, 1] | max * 100) | round | int] | min }}%"></span></div>
+      {% else %}<p class="muted" style="margin: 0">Personne ne propose encore de place. Indiquez-le en répondant « Je viens ».</p>{% endif %}
+    </section>
+    {% endif %}
+    {% if todo %}
+    <section class="card todo" aria-labelledby="pour-club">
+      <h2 id="pour-club" style="margin-top: 0">Pour le club</h2>
+      {% if todo.expired is not none %}<a href="/admin/memberships"><span>Adhésions expirées</span><strong>{{ todo.expired }}</strong></a>{% endif %}
+      <a href="/admin/users"><span>Invitations en attente</span><strong>{{ todo.invites }}</strong></a>
+      <a href="/club"><span>Toute l'administration</span><span aria-hidden="true">›</span></a>
+    </section>
+    {% endif %}
+  </aside>
 </div>
 {% endblock %}

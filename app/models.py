@@ -301,3 +301,29 @@ class ClubFavorite(Base):
     added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     site: Mapped[Site] = relationship()
+
+
+class ClubRequest(Base):
+    """Demande de création de club déposée depuis la page publique, traitée par un super administrateur."""
+
+    __tablename__ = "club_requests"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    club_name: Mapped[str] = mapped_column(String(120))
+    city: Mapped[str] = mapped_column(String(120))
+    first_name: Mapped[str] = mapped_column(String(60))
+    last_name: Mapped[str] = mapped_column(String(60))
+    email: Mapped[str] = mapped_column(String(255), index=True)
+    phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    members: Mapped[int | None] = mapped_column(Integer, nullable=True)   # effectif approximatif
+    message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(10), default="pending", index=True)   # pending | approved | rejected
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    decided_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    decision_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    club_id: Mapped[int | None] = mapped_column(Integer, nullable=True)   # club créé à la validation
+
+    @property
+    def contact_name(self) -> str:
+        return f"{self.first_name} {self.last_name}".strip()

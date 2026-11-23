@@ -28,6 +28,7 @@
 {% if user.is_super %}
 <h2>Super administration</h2>
 <div class="hub">
+  <a href="/admin/requests">Demandes de clubs<span>{{ pending_requests ~ ' en attente' if pending_requests else 'Aucune demande en attente' }}</span></a>
   <a href="/admin/clubs">Clubs<span>Créer, supprimer</span></a>
   <a href="/admin/sites">Import des sites<span>OpenStreetMap</span></a>
 </div>

@@ -33,6 +33,12 @@ L'application est servie sur `https://$APP_HOST` (routeur `climbing`, entrypoint
 
 Sauvegarde : volume Docker `pgdata` (`docker compose exec db pg_dump -U climbing climbing > backup.sql`).
 
+## Pages publiques et demandes de création de club
+
+- **`/`** présente l'application aux visiteurs non connectés (les membres connectés y voient leur agenda). Aucune donnée de club n'y figure.
+- **`/creer-un-club`** : formulaire public de demande (nom et ville du club, responsable, email, téléphone et effectif facultatifs, message, consentement). Protégé par jeton CSRF, champ piège anti-robots et limites (3 demandes par heure et par IP, 2 par jour et par adresse) ; une seule demande en cours par adresse ; un nom de club existant est refusé. Les super administrateurs sont prévenus par email (SMTP), sans les coordonnées du demandeur.
+- **Gestion des demandes** (*Club → Demandes de clubs*, super administrateur) : liste par statut, fiche détaillée avec alertes (nom de club pris, email ayant déjà un compte). **Accepter** crée le club (nom modifiable) et le compte administrateur du demandeur, qui reçoit par SMTP un lien d'activation valable 7 jours (sans SMTP : mot de passe provisoire affiché). **Refuser** avec un motif facultatif, envoyé au demandeur si souhaité. **Supprimer** efface la demande et les données du demandeur. Tout est tracé dans le journal d'audit.
+
 ## Interface
 
 - **Agenda** (accueil) : la semaine en tête (sorties du jour et météo du site), puis les sorties à venir avec la réponse **Je viens / Peut-être / Non** et les places de covoiturage directement depuis la liste. Colonne de droite : sorties en attente de réponse, covoiturage de la prochaine sortie et, pour les administrateurs, ce qui reste à faire pour le club.

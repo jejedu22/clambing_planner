@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, joinedload
 from ..config import settings
 from ..db import get_db
 from ..models import AuthToken, ClubIntegration, Outing, Participation, User, utcnow
-from ..security import login_required
+from ..security import RedirectTo, current_user_optional, login_required
 from ..services import memberships, weather
 from ..web import render
 
@@ -46,7 +46,13 @@ def club_todo(db: Session, user: User) -> dict | None:
 
 
 @router.get("/")
-def home(request: Request, week: str = "", user: User = Depends(login_required), db: Session = Depends(get_db)):
+def home(request: Request, week: str = "", user: User | None = Depends(current_user_optional),
+         db: Session = Depends(get_db)):
+    if user is None:                       # visiteur : page de présentation publique
+        from .public import landing
+        return landing(request, db)
+    if user.must_change_password:
+        raise RedirectTo("/password")
     t = today()
     try:
         ref = date.fromisoformat(week) if week else t
@@ -88,4 +94,5 @@ def home(request: Request, week: str = "", user: User = Depends(login_required),
 
 @router.get("/club")
 def club_hub(request: Request, user: User = Depends(login_required), db: Session = Depends(get_db)):
-    return render(request, "club.html", todo=club_todo(db, user))
+    from .requests_admin import pending_count
+    return render(request, "club.html", todo=club_todo(db, user), pending_requests=pending_count(db) if user.is_super else 0)

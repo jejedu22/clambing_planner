@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Climbing Planner — organisez les sorties d'escalade de votre club{% endblock %}
+{% block content %}
+<section class="hero">
+  <div class="hero-text">
+    <p class="eyebrow">Pour les clubs et associations d'escalade</p>
+    <h1>Organisez les sorties du club, de la falaise au covoiturage.</h1>
+    <p class="lead">Proposez une sortie, choisissez le site selon la météo, laissez chacun répondre en un geste et remplissez les voitures. Les membres du club retrouvent tout au même endroit, sur ordinateur comme sur téléphone.</p>
+    <div class="actions">
+      <a class="btn" href="/creer-un-club">Créer mon club</a>
+      <a class="btn secondary" href="/login">J'ai déjà un compte</a>
+    </div>
+  </div>
+  <div class="hero-card" aria-hidden="true">
+    <div class="when">samedi · 8h30</div>
+    <div class="hero-title">Bloc en forêt</div>
+    <div class="muted">6 / 8 inscrits · 2 places en voiture</div>
+    <span class="badge">Bonnes conditions · rocher sec</span>
+    <div class="segmented" style="margin-top: .8rem"><span class="seg on">Je viens</span><span class="seg">Peut-être</span><span class="seg">Non</span></div>
+  </div>
+</section>
+
+<section id="fonctionnalites" aria-labelledby="f-title">
+  <h2 id="f-title">Ce que Climbing Planner apporte au club</h2>
+  <div class="features">
+    <article class="card"><h3>L'agenda de la semaine</h3><p>Les sorties à venir avec la météo du site. Chaque membre répond « Je viens / Peut-être / Non » directement depuis la liste.</p></article>
+    <article class="card"><h3>{{ '{:,}'.format(sites).replace(',', ' ') ~ ' sites' if sites else 'Les sites' }} d'escalade</h3><p>Les falaises et blocs de France issus d'OpenStreetMap, sur une carte centrée sur votre club, avec les favoris et les notes du club.</p></article>
+    <article class="card"><h3>La météo qui compte</h3><p>16 jours de prévisions, la pluie de la veille et un avis simple : bonnes conditions, risque, déconseillé (pluie, vent, chaleur, froid).</p></article>
+    <article class="card"><h3>Covoiturage</h3><p>Chacun indique les places qu'il propose : on voit tout de suite s'il reste de la place dans les voitures.</p></article>
+    <article class="card"><h3>Adhésions HelloAsso</h3><p>Synchronisez le formulaire d'adhésion du club, voyez qui est à jour et invitez les adhérents en un clic. Paiements des sorties possibles.</p></article>
+    <article class="card"><h3>Emails et rappels</h3><p>Nouvelle sortie, modification, annulation, rappel la veille avec la météo, via le compte Mailjet du club.</p></article>
+  </div>
+</section>
+
+<section aria-labelledby="how-title">
+  <h2 id="how-title">Comment démarrer</h2>
+  <ol class="steps">
+    <li><strong>Demandez la création du club</strong> avec le formulaire : nom, ville et coordonnées du responsable.</li>
+    <li><strong>Nous validons la demande</strong> et vous recevez un lien pour activer votre compte d'administrateur.</li>
+    <li><strong>Invitez vos membres</strong> un par un, par import CSV ou depuis HelloAsso, puis proposez votre première sortie.</li>
+  </ol>
+  <p><a class="btn" href="/creer-un-club">Demander la création de mon club</a></p>
+</section>
+
+<section aria-labelledby="faq-title">
+  <h2 id="faq-title">Questions fréquentes</h2>
+  <details class="card"><summary><strong>Les données du club sont-elles visibles par les autres clubs ?</strong></summary><p>Non. Sorties, membres, favoris et notes ne sont visibles que des membres du club.</p></details>
+  <details class="card"><summary><strong>Faut-il installer une application ?</strong></summary><p>Non, un navigateur suffit. Sur téléphone, l'application peut être ajoutée à l'écran d'accueil.</p></details>
+  <details class="card"><summary><strong>D'où viennent les sites et la météo ?</strong></summary><p>Les sites viennent d'OpenStreetMap (contributeurs bénévoles, qualité variable selon les secteurs), la météo d'Open-Meteo.</p></details>
+</section>
+{% endblock %}

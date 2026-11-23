@@ -24,13 +24,17 @@
 
 <h2>Participation</h2>
 {% if not outing.cancelled %}
-<form method="post" action="/outings/{{ outing.id }}/respond" class="card inline-form">
+<form method="post" action="/outings/{{ outing.id }}/respond" class="card reply">
   <input type="hidden" name="csrf" value="{{ csrf }}">
-  <label class="inline">Places de covoiturage proposées
-    <input type="number" name="seats" min="0" max="8" value="{{ mine.seats if mine else 0 }}" style="width:5em"></label>
-  {% for key, label in statuses.items() %}
-    <button name="status" value="{{ key }}" class="{{ 'active' if mine and mine.status == key }}">{{ label }}</button>
-  {% endfor %}
+  <div class="segmented" role="group" aria-label="Ma réponse">
+    <button class="yes" name="status" value="yes" aria-pressed="{{ 'true' if mine and mine.status == 'yes' else 'false' }}">Je viens</button>
+    <button name="status" value="maybe" aria-pressed="{{ 'true' if mine and mine.status == 'maybe' else 'false' }}">Peut-être</button>
+    <button name="status" value="no" aria-pressed="{{ 'true' if mine and mine.status == 'no' else 'false' }}">Non</button>
+  </div>
+  <label class="inline">Je propose
+    <select name="seats" aria-label="Places proposées en voiture">
+      {% for n in range(0, 7) %}<option value="{{ n }}" {{ 'selected' if mine and mine.seats == n }}>{{ n }} place{{ 's' if n > 1 }}</option>{% endfor %}
+    </select></label>
 </form>
 {% endif %}
 {% if groups.yes %}<p class="muted">🚙 {{ seats }} place(s) de covoiturage proposée(s)</p>{% endif %}

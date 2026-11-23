@@ -18,6 +18,38 @@
   <a href="https://www.google.com/maps/dir/?api=1&destination={{ site.lat }},{{ site.lon }}" rel="noopener noreferrer" target="_blank">Itinéraire</a>
 </p>
 {% if user.is_admin %}<p><a class="btn" href="/outings/new?site={{ site.id }}">Organiser une sortie ici</a></p>{% endif %}
+
+{# --- Favoris du club --- #}
+{% if user.club_id %}
+<section class="card">
+  <h3>⭐ Favori du club</h3>
+  {% if fav %}<p>Ce site est un favori de votre club.{% if fav.note %}<br>📝 <span style="white-space:pre-wrap">{{ fav.note }}</span>{% endif %}</p>
+  {% else %}<p class="muted">Ce site n'est pas dans les favoris de votre club.</p>{% endif %}
+  {% if user.is_admin %}
+  <form method="post" action="/sites/{{ site.id }}/favorite">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="next" value="/sites/{{ site.id }}">
+    <label>Note pour le club <small class="muted">(parking, accès, difficulté…)</small>
+      <textarea name="note" rows="2" maxlength="300">{{ fav.note if fav and fav.note else '' }}</textarea></label>
+    <button>{{ 'Enregistrer la note' if fav else '☆ Ajouter aux favoris' }}</button>
+  </form>
+  {% if fav %}<form method="post" action="/sites/{{ site.id }}/unfavorite" style="margin-top:.5rem">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="next" value="/sites/{{ site.id }}"><button class="danger">Retirer des favoris</button></form>{% endif %}
+  {% endif %}
+</section>
+{% elif user.is_super %}
+<section class="card">
+  <h3>⭐ Favoris des clubs</h3>
+  {% if fav_clubs %}<ul>{% for c in fav_clubs %}<li>{{ c.name }}
+    <form method="post" action="/sites/{{ site.id }}/unfavorite" style="display:inline"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="club_id" value="{{ c.id }}"><input type="hidden" name="next" value="/sites/{{ site.id }}"><button class="link">Retirer</button></form></li>{% endfor %}</ul>
+  {% else %}<p class="muted">Aucun club n'a ce site en favori.</p>{% endif %}
+  <form method="post" action="/sites/{{ site.id }}/favorite" class="filters">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="next" value="/sites/{{ site.id }}">
+    <select name="club_id" required><option value="">— Ajouter pour le club… —</option>
+      {% for c in clubs if c not in fav_clubs %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select>
+    <button>☆ Ajouter</button>
+  </form>
+</section>
+{% endif %}
 <div id="map" class="small" data-lat="{{ site.lat }}" data-lon="{{ site.lon }}"></div>
 <h2>Météo</h2>
 {% if forecast %}

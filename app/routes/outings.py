@@ -120,14 +120,16 @@ def outing_detail(outing_id: int, request: Request, user: User = Depends(login_r
 
 @router.post("/outings/{outing_id}/respond")
 def outing_respond(outing_id: int, request: Request, status: str = Form(...),
-                   seats: int = Form(0), user: User = Depends(login_required),
+                   seats: int = Form(0), next: str = Form(""), user: User = Depends(login_required),
                    db: Session = Depends(get_db)):
+    from .favorites import safe_next
     outing = get_outing(db, user, outing_id)
+    back = safe_next(next, f"/outings/{outing.id}")
     if status not in STATUSES:
         raise HTTPException(400)
     if outing.cancelled or outing.day < today():
         flash(request, "Cette sortie n'accepte plus de réponses.", "error")
-        return RedirectResponse(f"/outings/{outing.id}", status_code=303)
+        return RedirectResponse(back, status_code=303)
     part = db.scalar(select(Participation).where(
         Participation.outing_id == outing.id, Participation.user_id == user.id))
     if status == "yes" and outing.max_participants and not (part and part.status == "yes"):
@@ -135,7 +137,7 @@ def outing_respond(outing_id: int, request: Request, status: str = Form(...),
             Participation.outing_id == outing.id, Participation.status == "yes"))
         if yes >= outing.max_participants:
             flash(request, "La sortie est complète.", "error")
-            return RedirectResponse(f"/outings/{outing.id}", status_code=303)
+            return RedirectResponse(back, status_code=303)
     if part is None:
         part = Participation(outing_id=outing.id, user_id=user.id, status=status)
         db.add(part)
@@ -143,7 +145,7 @@ def outing_respond(outing_id: int, request: Request, status: str = Form(...),
     part.seats = max(0, min(seats, 8)) if status == "yes" else 0
     db.commit()
     flash(request, "Réponse enregistrée.", "ok")
-    return RedirectResponse(f"/outings/{outing.id}", status_code=303)
+    return RedirectResponse(back, status_code=303)
 
 
 def _editable(db: Session, user: User, outing_id: int) -> Outing:

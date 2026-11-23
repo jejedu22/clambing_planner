@@ -6,7 +6,7 @@ import time
 
 import bcrypt
 from fastapi import Depends, HTTPException, Request
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from .db import get_db
 from .models import User, UserPref
@@ -70,7 +70,9 @@ async def verify_csrf(request: Request) -> None:
 
 def current_user_optional(request: Request, db: Session = Depends(get_db)) -> User | None:
     uid = request.session.get("uid")
-    user = db.get(User, uid) if uid else None
+    # le club est chargé tout de suite : l'en-tête l'affiche, y compris sur les pages d'erreur
+    # rendues après la fermeture de la session (sinon : chargement différé impossible)
+    user = db.get(User, uid, options=[joinedload(User.club)]) if uid else None
     if user is not None and not user.is_active:
         user = None
     if user is not None and request.session.get("ep", 0) != session_epoch(db, user.id):

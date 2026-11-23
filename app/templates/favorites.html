@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Sites favoris — Climbing Planner{% endblock %}
+{% block content %}
+<h1>⭐ Sites favoris{% if club %} <small class="muted">— {{ club.name }}</small>{% endif %}</h1>
+{% if clubs %}
+<form class="filters" method="get" action="/sites/favorites">
+  <select name="club" onchange="this.form.submit()"><option value="">— Choisir un club —</option>
+    {% for c in clubs %}<option value="{{ c.id }}" {{ 'selected' if club and club.id == c.id }}>{{ c.name }}</option>{% endfor %}</select>
+</form>
+{% endif %}
+{% if not club %}
+  <p class="muted">{% if user.is_super %}Choisissez un club.{% else %}Vous n'appartenez à aucun club.{% endif %}</p>
+{% else %}
+  <p class="muted">Les sites que le club retient pour ses sorties. {% if can_manage %}Ajoutez-en depuis la <a href="/sites">liste des sites</a> ou la fiche d'un site.{% endif %}</p>
+  <div class="grid">
+  {% for f in rows %}
+    <div class="card outing">
+      <h3><a href="/sites/{{ f.site.id }}">{{ f.site.display_name }}</a></h3>
+      <div>{% for t in f.site.type_labels %}<span class="tag">{{ t }}</span>{% endfor %}{% if f.site.rock %}<span class="tag">{{ f.site.rock }}</span>{% endif %}</div>
+      {% if f.note %}<p style="margin:.3rem 0;white-space:pre-wrap">📝 {{ f.note }}</p>{% endif %}
+      <div class="actions">
+        {% if can_manage %}
+        <a class="btn" href="/outings/new?site={{ f.site.id }}">Organiser une sortie</a>
+        <form method="post" action="/sites/{{ f.site.id }}/unfavorite"><input type="hidden" name="csrf" value="{{ csrf }}">
+          {% if user.is_super %}<input type="hidden" name="club_id" value="{{ club.id }}">{% endif %}
+          <input type="hidden" name="next" value="/sites/favorites{{ '?club=' ~ club.id if user.is_super }}"><button class="danger">Retirer</button></form>
+        {% endif %}
+      </div>
+    </div>
+  {% else %}
+    <p class="muted">Aucun favori pour l'instant.</p>
+  {% endfor %}
+  </div>
+{% endif %}
+{% endblock %}

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from ..audit import audit
 from ..db import get_db
-from ..models import ROLE_LABELS, Club, ClubIntegration, Outing, Role, Site, SiteImport, User
+from ..models import ROLE_LABELS, Club, ClubFavorite, ClubIntegration, Membership, Outing, Role, Site, SiteImport, User
 from ..security import (
     admin_required, generate_password, hash_password, password_error, super_required,
 )
@@ -60,6 +60,13 @@ def club_delete(club_id: int, request: Request, user: User = Depends(super_requi
     if has_data:
         flash(request, "Impossible : ce club a encore des utilisateurs ou des sorties.", "error")
     else:
+        # Données rattachées au club (clés étrangères) : sinon PostgreSQL refuse la suppression
+        for model in (ClubFavorite, Membership):
+            for row in db.scalars(select(model).where(model.club_id == club_id)):
+                db.delete(row)
+        integ = db.get(ClubIntegration, club_id)
+        if integ:
+            db.delete(integ)
         db.delete(club)
         db.commit()
         audit("club.deleted", request, club_id=club_id, target=f"club:{club_id}", detail=club.name)

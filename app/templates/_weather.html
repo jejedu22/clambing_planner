@@ -1,5 +1,6 @@
-{% macro day_card(d) %}
-<div class="wday {{ d.verdict }}">
+{% macro day_card(d, title=none, extra_class='') %}
+<div class="wday {{ d.verdict }} {{ extra_class }}">
+  {% if title %}<div class="wtitle">{{ title }}</div>{% endif %}
   <div class="wd">{{ d.date | fr_date(true) }}</div>
   <div class="wi">{{ d.icon }}</div>
   <div class="wt">{{ d.tmax | round | int }}° <small>/ {{ d.tmin | round | int }}°</small></div>
@@ -11,3 +12,8 @@
 {% macro badge(d) %}
 <span class="badge {{ d.verdict }}" title="{{ d.verdict_text }}">{{ d.icon }} {{ d.tmax | round | int }}°/{{ d.tmin | round | int }}° — {{ d.verdict_text }}</span>
 {% endmacro %}
+
+{# Ligne compacte : la veille d'une sortie (pluie surtout) #}
+{% macro eve_line(d) %}{% if d and d.eve %}{% set e = d.eve %}
+<span class="eve-line{{ ' wet' if (e.rain or 0) >= 1 }}">Veille : {{ e.icon }} {{ e.label | lower }} · {{ e.rain }} mm{% if (e.rain or 0) >= 1 %} — rocher peut-être humide{% endif %}</span>
+{% endif %}{% endmacro %}

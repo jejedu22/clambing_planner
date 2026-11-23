@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Agenda — Climbing Planner{% endblock %}
+{% from "_weather.html" import eve_line %}
 {% block content %}
 <div class="page-head">
   <h1>{{ title }}</h1>
@@ -50,6 +51,7 @@
           <div class="muted">{{ o.site.display_name }}{% if o.meeting_point %} · {{ o.meeting_point }}{% endif %} ·
             {{ st.yes }}{% if o.max_participants %} / {{ o.max_participants }}{% endif %} inscrit(s){% if st.seats %} · {{ st.seats }} place(s) en voiture{% endif %}
             {% if user.is_super %} · {{ o.club.name }}{% endif %}</div>
+          {{ eve_line(f) }}
         </div>
         {% if f %}<span class="badge {{ f.verdict }}">{{ f.verdict_text }}</span>
         {% else %}<span class="badge neutral">Météo 16 jours avant</span>{% endif %}

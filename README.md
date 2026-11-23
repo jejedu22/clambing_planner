@@ -47,6 +47,14 @@ L'inscription à un club **n'est pas publique**. Un administrateur crée un lien
 
 Sécurité : jeton aléatoire de 192 bits, stocké haché (recherche) et chiffré (pour pouvoir recopier le lien), jamais journalisé ; lien révocable à tout moment ; limite d'utilisations appliquée par la base ; page `/rejoindre/…` non indexée et sans transmission du lien en *referer* ; CSRF, champ piège anti-robots et 5 inscriptions par heure et par IP. Un lien expiré, complet ou révoqué affiche simplement « Lien non valable ».
 
+## Partager une sortie avec des non-membres
+
+Sur la fiche d'une sortie, un administrateur du club crée un **lien de partage** (*Partager avec des non-membres*). Toute personne qui a le lien voit la sortie (date, site, rendez-vous, météo, places restantes, mais jamais les noms des participants) et s'y inscrit **sans compte** : prénom, nom, email, téléphone facultatif.
+- Les invités comptent dans les places, apparaissent dans la sortie (nom pour les membres, coordonnées pour les administrateurs, qui peuvent les retirer) et sont rapprochés des paiements HelloAsso par leur email.
+- Ils reçoivent une confirmation avec un **lien personnel de désinscription**, et sont prévenus des modifications, de l'annulation et du rappel de la veille (Mailjet du club, sinon SMTP).
+- Un seul lien actif par sortie : « Nouveau lien » désactive l'ancien, « Désactiver » le coupe. Il cesse de fonctionner tout seul après la sortie ou si elle est annulée.
+- Même sécurité que les liens d'inscription : jetons de 192 bits hachés et chiffrés, jamais journalisés, pages non indexées et sans *referer*, CSRF, champ piège, 10 inscriptions par heure et par IP. Un membre du club est invité à se connecter plutôt qu'à s'inscrire comme invité.
+
 ## Clubs (super administrateur)
 
 *Club → Clubs* liste les clubs. **Modifier** ouvre la fiche d'un club : renommage (nom unique, casse ignorée, tracé dans le journal d'audit), résumé (membres, administrateurs, sorties, favoris, localisation, intégrations) et accès directs à ses membres, sa localisation, ses favoris, ses intégrations, ses adhésions et son journal. Un club sans membres ni sorties peut être supprimé.

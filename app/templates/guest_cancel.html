@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Désinscription — Climbing Planner{% endblock %}
+{% block head %}<meta name="referrer" content="no-referrer"><meta name="robots" content="noindex">{% endblock %}
+{% block content %}
+<section class="card narrow">
+{% if invalid %}
+  <h1>Lien non valable</h1>
+  <p>Ce lien de désinscription n'est plus valable : vous êtes peut-être déjà désinscrit(e).</p>
+{% elif done %}
+  <h1>Désinscription faite</h1>
+  <p>Vous n'êtes plus inscrit(e) à « {{ outing.title }} ». Votre place est libérée.</p>
+{% else %}
+  <h1>Se désinscrire</h1>
+  <p>Voulez-vous annuler votre inscription à « {{ guest.outing.title }} » du {{ guest.outing.day | fr_date }} ?</p>
+  <form method="post" action="/invite/annuler/{{ token }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="danger">Me désinscrire</button></form>
+{% endif %}
+</section>
+{% endblock %}

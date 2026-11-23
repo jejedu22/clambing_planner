@@ -78,7 +78,8 @@ def home(request: Request, week: str = "", user: User | None = Depends(current_u
                  for oid, o in every.items() if t - timedelta(days=3) <= o.day <= t + timedelta(days=15)}
     mine = {p.outing_id: p for p in db.scalars(select(Participation).where(
         Participation.user_id == user.id, Participation.outing_id.in_(list(every) or [0])))}
-    stats = {o.id: {"yes": sum(1 for p in o.participations if p.status == "yes"),
+    stats = {o.id: {"yes": sum(1 for p in o.participations if p.status == "yes") + len(o.guests),
+                    "guests": len(o.guests),
                     "seats": sum(p.seats for p in o.participations if p.status == "yes"),
                     "drivers": sum(1 for p in o.participations if p.status == "yes" and p.seats)} for o in upcoming}
     can_reply = {o.id: o.club_id == user.club_id for o in upcoming}

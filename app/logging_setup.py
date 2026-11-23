@@ -17,7 +17,7 @@ from .config import settings
 request_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("request_id", default="-")
 
 _STD = set(logging.LogRecord("", 0, "", 0, "", (), None).__dict__) | {"message", "asctime", "request_id"}
-_RESET_RE = re.compile(r"^(/reset/|/rejoindre/).+")
+_RESET_RE = re.compile(r"^(/reset/|/rejoindre/|/sortie/|/invite/annuler/).+")
 
 
 class ContextFilter(logging.Filter):

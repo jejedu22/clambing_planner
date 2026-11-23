@@ -111,10 +111,17 @@ def outing_detail(outing_id: int, request: Request, user: User = Depends(login_r
     ).all()
     groups = {s: [p for p in parts if p.status == s] for s in STATUSES}
     mine = next((p for p in parts if p.user_id == user.id), None)
+    can_edit = user.is_super or (user.is_admin and user.club_id == outing.club_id)
+    from .guests import active_link, share_url
+    from ..services import crypto
+    link = active_link(db, outing.id) if can_edit else None
+    raw = crypto.decrypt(link.token_enc) if link else None
     return render(request, "outing_detail.html", outing=outing, groups=groups, mine=mine,
+                  guests=outing.guests, share=share_url(request, raw) if raw else None,
+                  share_open=not outing.cancelled and outing.day >= today(),
                   statuses=STATUSES, seats=sum(p.seats for p in groups["yes"]),
                   forecast=weather.forecast_for_day(outing.site.lat, outing.site.lon, outing.day),
-                  can_edit=user.is_super or (user.is_admin and user.club_id == outing.club_id),
+                  can_edit=can_edit,
                   ha_ready=bool((i := db.get(ClubIntegration, outing.club_id)) and i.helloasso_ready))
 
 
@@ -133,9 +140,8 @@ def outing_respond(outing_id: int, request: Request, status: str = Form(...),
     part = db.scalar(select(Participation).where(
         Participation.outing_id == outing.id, Participation.user_id == user.id))
     if status == "yes" and outing.max_participants and not (part and part.status == "yes"):
-        yes = db.scalar(select(func.count()).select_from(Participation).where(
-            Participation.outing_id == outing.id, Participation.status == "yes"))
-        if yes >= outing.max_participants:
+        from .guests import taken
+        if taken(db, outing) >= outing.max_participants:
             flash(request, "La sortie est complète.", "error")
             return RedirectResponse(back, status_code=303)
     if part is None:
@@ -257,8 +263,9 @@ def outing_payments(outing_id: int, request: Request, refresh: int = 0, user: Us
                     p["cents"] += it.amount_cents
             parts = db.scalars(select(Participation).options(joinedload(Participation.user)).where(
                 Participation.outing_id == outing.id, Participation.status == "yes")).all()
-            emails = {p.user.email for p in parts}
-            ctx["rows"] = sorted(((p.user, paid.get(p.user.email)) for p in parts), key=lambda r: r[0].name.lower())
+            people_rows = [p.user for p in parts] + list(outing.guests)
+            emails = {u.email for u in people_rows}
+            ctx["rows"] = sorted(((u, paid.get(u.email)) for u in people_rows), key=lambda r: r[0].name.lower())
             club_emails = {u.email for u in db.scalars(select(User).where(User.club_id == outing.club_id))}
             ctx["unmatched"] = [(e, v) for e, v in paid.items() if e not in emails and e not in club_emails]
     except HelloAssoError as exc:

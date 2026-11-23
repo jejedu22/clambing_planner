@@ -16,7 +16,10 @@
 
 <h2>Météo sur place</h2>
 {% if forecast %}
-  <div class="weather">{{ day_card(forecast) }}</div>
+  <div class="weather">
+    {% if forecast.eve %}{{ day_card(forecast.eve, 'Veille', 'eve') }}{% endif %}
+    {{ day_card(forecast, 'Jour de la sortie') }}
+  </div>
   <p class="verdict {{ forecast.verdict }}">{{ forecast.verdict_text }}</p>
 {% else %}
   <p class="muted">Pas encore de prévision pour cette date (disponible jusqu'à 16 jours à l'avance).</p>

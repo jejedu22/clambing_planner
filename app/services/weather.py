@@ -76,6 +76,12 @@ def parse_daily(payload: dict) -> list[dict]:
     for i, day in enumerate(days):
         prev = sum((p["rain"] or 0) for p in days[max(0, i - 2):i])
         day["verdict"], day["verdict_text"] = verdict(day, prev)
+    for i, day in enumerate(days):
+        # La veille (passée ou prévue) : c'est surtout sa pluie qui dit si le rocher sera sec.
+        # Copie des seuls champs utiles : pas de référence circulaire entre les jours.
+        eve = days[i - 1] if i > 0 else None
+        day["eve"] = {k: eve[k] for k in ("date", "code", "label", "icon", "tmin", "tmax", "rain", "rain_prob", "wind")} \
+            if eve else None
     return days
 
 

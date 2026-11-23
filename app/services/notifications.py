@@ -116,6 +116,10 @@ def send_reminders() -> int:
             db.commit()
             f = weather.forecast_for_day(o.site.lat, o.site.lon, o.day)
             extra = [f"Météo prévue : {f['label']}, {round(f['tmin'])}° / {round(f['tmax'])}° — {f['verdict_text']}"] if f else None
+            if f and f.get("eve"):
+                e = f["eve"]
+                extra.append(f"Veille : {e['label'].lower()}, {e['rain']} mm de pluie"
+                             + (" — rocher peut-être humide" if (e["rain"] or 0) >= 1 else ""))
             mails = _mails(_participants(db, o, None), o, f"Rappel demain : {o.title}",
                            f"Rappel : la sortie « {o.title} » a lieu demain.", extra)
             total += mailer.send_for_club(o.club_id, mails)

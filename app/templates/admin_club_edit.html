@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}{{ club.name }} — Climbing Planner{% endblock %}
+{% block content %}
+<p><a href="/admin/clubs">← Clubs</a></p>
+<div class="page-head"><h1>{{ club.name }}</h1></div>
+
+<div class="two-cols">
+  <form method="post" action="/admin/clubs/{{ club.id }}/edit" class="card">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <h2 style="margin-top: 0">Nom du club</h2>
+    <label>Nom <input name="name" required maxlength="120" value="{{ form_name if form_name is defined else club.name }}"></label>
+    <p class="muted" style="margin: 0 0 .8rem">Visible par les membres dans l'en-tête et les emails. Le nom doit être unique.</p>
+    <button>Enregistrer</button>
+  </form>
+
+  <section class="card" aria-labelledby="resume">
+    <h2 id="resume" style="margin-top: 0">En bref</h2>
+    <dl class="facts">
+      <dt>Créé le</dt><dd>{{ club.created_at.strftime('%d/%m/%Y') }}</dd>
+      <dt>Membres</dt><dd>{{ summary.members }} ({{ summary.active }} actif{{ 's' if summary.active > 1 }})</dd>
+      <dt>Administrateurs</dt><dd>{% for a in summary.admins %}{{ a.name }}{{ ', ' if not loop.last }}{% else %}<span class="verdict bad">Aucun</span>{% endfor %}</dd>
+      <dt>Sorties</dt><dd>{{ summary.outings }} dont {{ summary.upcoming }} à venir</dd>
+      <dt>Favoris</dt><dd>{{ summary.favorites }}</dd>
+      <dt>Localisation</dt><dd>{{ club.home_label or 'Définie' if club.has_home else 'Non définie' }}</dd>
+      <dt>Mailjet</dt><dd>{{ 'Configuré' if summary.mailjet else 'Non configuré' }}</dd>
+      <dt>HelloAsso</dt><dd>{{ 'Configuré' if summary.helloasso else 'Non configuré' }}</dd>
+    </dl>
+  </section>
+</div>
+
+<h2>Gérer ce club</h2>
+<div class="hub">
+  <a href="/admin/users?club={{ club.id }}">Membres<span>Comptes, rôles, administrateurs</span></a>
+  <a href="/admin/club-location?club={{ club.id }}">Localisation<span>Centre de la carte des sites</span></a>
+  <a href="/sites/favorites?club={{ club.id }}">Favoris<span>Sites retenus par le club</span></a>
+  <a href="/admin/integrations?club={{ club.id }}">Intégrations<span>Mailjet, HelloAsso</span></a>
+  <a href="/admin/memberships?club={{ club.id }}">Adhésions<span>Synchronisation HelloAsso</span></a>
+  <a href="/admin/logs?club={{ club.id }}">Journal<span>Actions liées au club</span></a>
+</div>
+
+<h2>Supprimer</h2>
+{% if summary.members or summary.outings %}
+  <p class="muted">Suppression impossible tant que le club a des membres ou des sorties.</p>
+{% else %}
+  <form method="post" action="/admin/clubs/{{ club.id }}/delete" onsubmit="return confirm('Supprimer définitivement ce club ?')">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><button class="danger">Supprimer le club</button></form>
+{% endif %}
+{% endblock %}

@@ -168,6 +168,10 @@ class Outing(Base):
     participations: Mapped[list[Participation]] = relationship(
         back_populates="outing", cascade="all, delete-orphan"
     )
+    guests: Mapped[list["OutingGuest"]] = relationship(
+        back_populates="outing", cascade="all, delete-orphan", order_by="OutingGuest.created_at"
+    )
+    share_links: Mapped[list["OutingShareLink"]] = relationship(cascade="all, delete-orphan")
 
 
 class Participation(Base):
@@ -363,3 +367,41 @@ class SignupLink(Base):
         if self.max_uses is not None and self.uses >= self.max_uses:
             return "full"
         return "active"
+
+
+
+class OutingShareLink(Base):
+    """Lien de partage d'une sortie, pour inscrire des personnes sans compte. Jeton haché + chiffré."""
+
+    __tablename__ = "outing_share_links"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    outing_id: Mapped[int] = mapped_column(ForeignKey("outings.id"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    token_enc: Mapped[str] = mapped_column(Text)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class OutingGuest(Base):
+    """Personne sans compte inscrite à une sortie par un lien de partage."""
+
+    __tablename__ = "outing_guests"
+    __table_args__ = (UniqueConstraint("outing_id", "email"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    outing_id: Mapped[int] = mapped_column(ForeignKey("outings.id"), index=True)
+    first_name: Mapped[str] = mapped_column(String(60))
+    last_name: Mapped[str] = mapped_column(String(60))
+    email: Mapped[str] = mapped_column(String(255))
+    phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    cancel_hash: Mapped[str] = mapped_column(String(64), unique=True)   # lien personnel de désinscription
+    cancel_enc: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    outing: Mapped[Outing] = relationship(back_populates="guests")
+
+    @property
+    def name(self) -> str:
+        return f"{self.first_name} {self.last_name}".strip()

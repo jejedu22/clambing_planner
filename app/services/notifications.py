@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from ..config import settings
 from ..db import SessionLocal
-from ..models import Outing, OutingReminder, Participation, User, UserPref, utcnow
+from ..models import Outing, OutingGuest, OutingReminder, Participation, User, UserPref, utcnow
 from . import mailer, smtp_mailer, tokens, weather
 from ..audit import audit
 from ..web import fr_date, fr_time
@@ -53,6 +53,32 @@ def _mails(users: list[User], o: Outing, subject: str, intro: str, extra: list[s
     return out
 
 
+def send_any(club_id: int, mails: list[mailer.Mail]) -> int:
+    """Emails transactionnels (invités sans compte) : Mailjet du club s'il existe, sinon SMTP du serveur."""
+    if not mails:
+        return 0
+    with SessionLocal() as db:
+        cfg = mailer.load_config(db, club_id)
+    if cfg is not None:
+        return mailer.send(cfg, mails)[0]
+    if smtp_mailer.configured():
+        return sum(1 for m in mails if smtp_mailer.send(m)[0])
+    return 0
+
+
+def _guest_mails(o: Outing, subject: str, intro: str, extra: list[str] | None = None) -> list[mailer.Mail]:
+    from . import crypto
+    out = []
+    for g in o.guests:
+        raw = crypto.decrypt(g.cancel_enc)
+        cancel = mailer.link(f"/invite/annuler/{raw}") if raw else None
+        text, html = mailer.build(subject, g.name, [intro, *_details(o), *(extra or [])],
+                                  ("Me désinscrire", cancel) if cancel else None,
+                                  f"Vous recevez cet email car vous êtes inscrit(e) à cette sortie de {o.club.name}.")
+        out.append(mailer.Mail(g.email, g.name, subject, text, html))
+    return out
+
+
 def outing_created(outing_id: int, actor_id: int | None) -> None:
     with SessionLocal() as db:
         o = _outing(db, outing_id)
@@ -79,8 +105,11 @@ def outing_changed(outing_id: int, actor_id: int | None, changes: list[str]) -> 
             return
         mails = _mails(_participants(db, o, actor_id), o, f"Sortie modifiée : {o.title}",
                        f"La sortie « {o.title} » a été modifiée.", ["Changements : " + ", ".join(changes)])
+        guest = _guest_mails(o, f"Sortie modifiée : {o.title}", f"La sortie « {o.title} » a été modifiée.",
+                             ["Changements : " + ", ".join(changes)])
         club_id = o.club_id
     mailer.send_for_club(club_id, mails)
+    send_any(club_id, guest)
 
 
 def outing_cancelled(outing_id: int, actor_id: int | None, cancelled: bool) -> None:
@@ -93,8 +122,10 @@ def outing_cancelled(outing_id: int, actor_id: int | None, cancelled: bool) -> N
         else:
             subject, intro = f"Sortie rétablie : {o.title}", f"La sortie « {o.title} » est de nouveau d'actualité."
         mails = _mails(_participants(db, o, actor_id), o, subject, intro)
+        guest = _guest_mails(o, subject, intro)
         club_id = o.club_id
     mailer.send_for_club(club_id, mails)
+    send_any(club_id, guest)
 
 
 def send_reminders() -> int:
@@ -123,6 +154,8 @@ def send_reminders() -> int:
             mails = _mails(_participants(db, o, None), o, f"Rappel demain : {o.title}",
                            f"Rappel : la sortie « {o.title} » a lieu demain.", extra)
             total += mailer.send_for_club(o.club_id, mails)
+            total += send_any(o.club_id, _guest_mails(o, f"Rappel demain : {o.title}",
+                                                      f"Rappel : la sortie « {o.title} » a lieu demain.", extra))
     return total
 
 

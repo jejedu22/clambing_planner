@@ -42,6 +42,12 @@
 {% endif %}
 {% if groups.yes %}<p class="muted">🚙 {{ seats }} place(s) de covoiturage proposée(s)</p>{% endif %}
 <div class="grid">
+{% if guests %}
+  <div class="card"><h3>Invités ({{ guests | length }})</h3>
+  <ul class="guest-list">{% for g in guests %}<li>{{ g.name }}{% if can_edit %} <span class="muted">· {{ g.email }}{% if g.phone %} · {{ g.phone | phone }}{% endif %}</span>
+    <form method="post" action="/outings/{{ outing.id }}/guests/{{ g.id }}/remove" style="display:inline" onsubmit="return confirm('Retirer cet invité de la sortie ?')">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><button class="link">Retirer</button></form>{% endif %}</li>{% endfor %}</ul></div>
+{% endif %}
 {% for key, label in statuses.items() %}
   <div class="card"><h3>{{ label }} ({{ groups[key] | length }})</h3>
   <ul>{% for p in groups[key] %}<li>{{ p.user.name }}{% if p.seats %} · 🚙 {{ p.seats }}{% endif %}</li>{% endfor %}</ul></div>
@@ -49,6 +55,24 @@
 </div>
 
 {% if can_edit %}
+<h2 id="partage">Partager avec des non-membres</h2>
+<section class="card">
+  {% if not share_open %}
+    <p class="muted" style="margin: 0">La sortie est passée ou annulée : elle n'accepte plus d'inscriptions par lien.</p>
+  {% elif share %}
+    <p style="margin-top: 0">Toute personne qui a ce lien peut s'inscrire à cette sortie sans créer de compte (elle ne voit pas les noms des participants). Il cesse de fonctionner après la sortie ou si vous la désactivez.</p>
+    <div class="copy-row"><input id="share-link" value="{{ share }}" readonly aria-label="Lien de partage de la sortie"><button type="button" class="secondary small" data-copy="share-link">Copier</button></div>
+    <div class="actions" style="margin-top: .8rem">
+      <form method="post" action="/outings/{{ outing.id }}/share" onsubmit="return confirm('Créer un nouveau lien ? L\'ancien ne fonctionnera plus.')"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="secondary small">Nouveau lien</button></form>
+      <form method="post" action="/outings/{{ outing.id }}/share/revoke"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="danger small">Désactiver</button></form>
+    </div>
+  {% else %}
+    <p style="margin-top: 0">Créez un lien pour inviter des personnes sans compte (amis, essai avant adhésion…). Elles s'inscrivent avec leur nom et leur email, et comptent dans les places.</p>
+    <form method="post" action="/outings/{{ outing.id }}/share"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Créer un lien de partage</button></form>
+  {% endif %}
+</section>
+<script src="/static/copy.js"></script>
+
 <h2>Administration</h2>
 <div class="actions">
   <a class="btn" href="/outings/{{ outing.id }}/edit">Modifier</a>

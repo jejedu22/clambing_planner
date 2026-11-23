@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% from "_weather.html" import eve_line %}
+{% block title %}{{ outing.title if outing else 'Sortie' }} — Climbing Planner{% endblock %}
+{% block head %}<meta name="referrer" content="no-referrer"><meta name="robots" content="noindex">{% endblock %}
+{% block content %}
+{% set f = form or {} %}
+<section class="card narrow" style="max-width: 640px">
+{% if invalid %}
+  <h1>Lien non valable</h1>
+  <p>Ce lien de sortie a expiré, a été désactivé, ou la sortie est passée ou annulée. Contactez la personne qui vous l'a envoyé.</p>
+{% elif done %}
+  <h1>Vous êtes inscrit(e)</h1>
+  <p>Votre inscription à « {{ outing.title }} » est enregistrée.{% if email %} Une confirmation va être envoyée à <strong>{{ email }}</strong>, avec un lien pour vous désinscrire si besoin.{% endif %}</p>
+  <p class="muted">Vous serez prévenu(e) par email si la sortie est modifiée ou annulée.</p>
+{% else %}
+  <p class="eyebrow">{{ outing.club.name }} vous invite</p>
+  <h1>{{ outing.title }}</h1>
+  <dl class="facts">
+    <dt>Date</dt><dd>{{ outing.day | fr_date }}{% if outing.meeting_time %} · rendez-vous {{ outing.meeting_time | fr_time }}{% endif %}</dd>
+    <dt>Site</dt><dd>{{ outing.site.display_name }} · <a href="https://www.openstreetmap.org/{{ outing.site.osm_id }}" rel="noopener noreferrer" target="_blank">carte</a></dd>
+    {% if outing.meeting_point %}<dt>Rendez-vous</dt><dd>{{ outing.meeting_point }}</dd>{% endif %}
+    {% if forecast %}<dt>Météo</dt><dd><span class="verdict {{ forecast.verdict }}">{{ forecast.verdict_text }}</span> · {{ forecast.tmax | round | int }}° / {{ forecast.tmin | round | int }}°<br>{{ eve_line(forecast) }}</dd>{% endif %}
+    {% if places is not none %}<dt>Places</dt><dd>{{ places }} restante(s)</dd>{% endif %}
+  </dl>
+  {% if outing.description %}<p style="white-space: pre-wrap">{{ outing.description }}</p>{% endif %}
+  {% if places == 0 %}
+    <p class="verdict bad">La sortie est complète.</p>
+  {% else %}
+  <h2>Je m'inscris</h2>
+  <form method="post" action="/sortie/{{ token }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="hp" aria-hidden="true"><label>Site web <input name="website" tabindex="-1" autocomplete="off"></label></div>
+    <div class="two-cols">
+      <label>Prénom <input name="first_name" required maxlength="55" value="{{ f.first_name or '' }}" autocomplete="given-name"></label>
+      <label>Nom <input name="last_name" required maxlength="55" value="{{ f.last_name or '' }}" autocomplete="family-name"></label>
+    </div>
+    <label>Email <small class="muted">(pour la confirmation et les changements)</small> <input type="email" name="email" required value="{{ f.email or '' }}" autocomplete="email"></label>
+    <label>Téléphone <small class="muted">(facultatif, pour les organisateurs)</small> <input type="tel" name="phone" maxlength="32" value="{{ f.phone or '' }}" autocomplete="tel"></label>
+    <label class="inline"><input type="checkbox" name="consent" value="1" required> J'accepte que mes coordonnées soient transmises aux organisateurs de la sortie.</label>
+    <p><button>M'inscrire</button></p>
+  </form>
+  <p class="muted">Pas besoin de compte. Membre de {{ outing.club.name }} ? <a href="/login">Connectez-vous</a> pour répondre.</p>
+  {% endif %}
+{% endif %}
+</section>
+{% endblock %}

@@ -31,7 +31,7 @@
       <td>{% if p %}<span class="badge">✅ {{ '%.2f' | format(p.cents / 100) }} €</span>{% else %}<span class="badge warn">Non payé</span>{% endif %}</td></tr>
     {% else %}<tr><td colspan="3" class="muted">Personne n'est encore inscrit.</td></tr>{% endfor %}
   </table>
-  <p class="muted">Le rapprochement se fait par email : celui du compte doit être celui du payeur HelloAsso.</p>
+  <p class="muted">Le rapprochement se fait par email (compte du membre ou email de l'invité) : il doit être celui du payeur HelloAsso.</p>
   {% if unmatched %}
   <h2>Paiements non rattachés</h2>
   <table><tr><th>Payeur</th><th>Email</th><th>Montant</th></tr>

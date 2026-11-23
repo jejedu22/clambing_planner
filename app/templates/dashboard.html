@@ -49,7 +49,7 @@
           <div class="when">{{ o.day | fr_date }}{% if o.meeting_time %} · {{ o.meeting_time | fr_time }}{% endif %}</div>
           <h3><a href="/outings/{{ o.id }}">{{ o.title }}</a></h3>
           <div class="muted">{{ o.site.display_name }}{% if o.meeting_point %} · {{ o.meeting_point }}{% endif %} ·
-            {{ st.yes }}{% if o.max_participants %} / {{ o.max_participants }}{% endif %} inscrit(s){% if st.seats %} · {{ st.seats }} place(s) en voiture{% endif %}
+            {{ st.yes }}{% if o.max_participants %} / {{ o.max_participants }}{% endif %} inscrit(s){% if st.guests %} dont {{ st.guests }} invité(s){% endif %}{% if st.seats %} · {{ st.seats }} place(s) en voiture{% endif %}
             {% if user.is_super %} · {{ o.club.name }}{% endif %}</div>
           {{ eve_line(f) }}
         </div>

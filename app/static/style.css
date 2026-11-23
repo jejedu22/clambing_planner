@@ -266,3 +266,30 @@ code { background: var(--surface-2); padding: 0 .3rem; border-radius: 4px; }
 }
 @media print { .app-header, .tabbar, footer { display: none; } body { background: #fff; } }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* --- Pages publiques ------------------------------------------------------------- */
+.hero { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 2.5rem; align-items: center; padding: 2rem 0 3rem; }
+.hero h1 { font-size: clamp(2rem, 4.2vw, 3rem); line-height: 1.1; margin: .25rem 0 1rem; }
+.eyebrow { color: var(--accent-text); font-weight: 800; text-transform: uppercase; letter-spacing: .06em; font-size: .85rem; margin: 0; }
+.lead { font-size: 1.15rem; color: var(--muted); max-width: 40rem; margin: 0 0 1.5rem; }
+.hero-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.4rem; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: .35rem; }
+.hero-card .when { font-weight: 700; color: var(--accent-text); }
+.hero-title { font-size: 1.35rem; font-weight: 800; }
+.hero-card .badge { align-self: flex-start; margin-top: .4rem; }
+.seg { min-height: 40px; padding: 0 1rem; border-radius: 9px; display: inline-flex; align-items: center; font-weight: 600; }
+.seg.on { background: var(--ok); color: var(--surface); font-weight: 800; }
+.features { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+.features .card { margin: 0; }
+.features p { margin: 0; color: var(--muted); }
+.steps { padding-left: 1.2rem; display: grid; gap: .6rem; max-width: 46rem; }
+details.card > summary { cursor: pointer; min-height: 32px; }
+details.card > p { margin: .75rem 0 0; color: var(--muted); }
+.hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+.facts { display: grid; grid-template-columns: max-content 1fr; gap: .4rem 1.25rem; margin: 0; }
+.facts dt { color: var(--muted); font-weight: 700; }
+.facts dd { margin: 0; }
+@media (max-width: 760px) {
+  .hero { grid-template-columns: 1fr; padding-top: .5rem; gap: 1.5rem; }
+  .facts { grid-template-columns: 1fr; }
+  .facts dd { margin-bottom: .4rem; }
+}

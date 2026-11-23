@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Créer un club — Climbing Planner{% endblock %}
+{% block content %}
+{% set f = form or {} %}
+<section class="card narrow" style="max-width: 640px">
+{% if sent %}
+  <h1>Demande envoyée</h1>
+  <p>Merci ! Votre demande va être examinée. Si elle est acceptée, vous recevrez par email un lien pour activer votre compte d'administrateur du club.</p>
+  <p><a href="/">Retour à l'accueil</a></p>
+{% else %}
+  <h1>Créer un club</h1>
+  <p class="muted">Remplissez ce formulaire : un administrateur de Climbing Planner étudie chaque demande avant de créer le club.</p>
+  <form method="post" action="/creer-un-club" novalidate>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="hp" aria-hidden="true"><label>Site web <input name="website" tabindex="-1" autocomplete="off"></label></div>
+    <label>Nom du club <input name="club_name" required maxlength="120" value="{{ f.club_name or '' }}" autocomplete="organization"></label>
+    <label>Ville ou secteur <input name="city" required maxlength="120" value="{{ f.city or '' }}" placeholder="ex. Fontainebleau, Seine-et-Marne"></label>
+    <div class="two-cols">
+      <label>Votre prénom <input name="first_name" required maxlength="55" value="{{ f.first_name or '' }}" autocomplete="given-name"></label>
+      <label>Votre nom <input name="last_name" required maxlength="55" value="{{ f.last_name or '' }}" autocomplete="family-name"></label>
+    </div>
+    <label>Email <small class="muted">(deviendra votre identifiant d'administrateur)</small>
+      <input type="email" name="email" required value="{{ f.email or '' }}" autocomplete="email"></label>
+    <div class="two-cols">
+      <label>Téléphone <small class="muted">(facultatif)</small> <input type="tel" name="phone" maxlength="32" value="{{ f.phone or '' }}" autocomplete="tel"></label>
+      <label>Nombre de membres <small class="muted">(environ)</small> <input type="number" name="members" min="1" max="100000" value="{{ f.members or '' }}"></label>
+    </div>
+    <label>Message <small class="muted">(facultatif)</small> <textarea name="message" maxlength="2000" rows="4">{{ f.message or '' }}</textarea></label>
+    <label class="inline"><input type="checkbox" name="consent" value="1" required> J'accepte que ces informations soient utilisées pour étudier ma demande et créer le compte du club.</label>
+    <p><button>Envoyer la demande</button></p>
+  </form>
+{% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Demande — {{ req.club_name }}{% endblock %}
+{% block content %}
+<p><a href="/admin/requests">← Demandes</a></p>
+<div class="page-head"><h1>{{ req.club_name }}</h1>
+  <span class="badge {{ 'warn' if req.status == 'pending' else 'bad' if req.status == 'rejected' else '' }}">{{ labels[req.status] }}</span></div>
+
+{% if approved %}
+  <div class="flash ok" role="status"><strong>Club « {{ club.name }} » créé.</strong>
+    {% if invited %}{{ req.contact_name }} a reçu par email un lien pour activer son compte d'administrateur (valable 7 jours).
+    {% else %}L'email n'a pas pu être envoyé : transmettez ces identifiants (affichés une seule fois).<br>
+      Email : <code>{{ credentials.email }}</code> — Mot de passe provisoire : <code>{{ credentials.password }}</code>{% endif %}</div>
+{% endif %}
+{% for c in conflicts %}<div class="flash error" role="alert">{{ c }}</div>{% endfor %}
+
+<div class="card">
+  <dl class="facts">
+    <dt>Ville ou secteur</dt><dd>{{ req.city }}</dd>
+    <dt>Responsable</dt><dd>{{ req.contact_name }}</dd>
+    <dt>Email</dt><dd><a href="mailto:{{ req.email }}">{{ req.email }}</a></dd>
+    <dt>Téléphone</dt><dd>{{ req.phone | phone or '—' }}</dd>
+    <dt>Membres</dt><dd>{{ req.members or '—' }}</dd>
+    <dt>Reçue le</dt><dd>{{ req.created_at.strftime('%d/%m/%Y %H:%M') }}</dd>
+    {% if req.decided_at %}<dt>Traitée le</dt><dd>{{ req.decided_at.strftime('%d/%m/%Y %H:%M') }}</dd>{% endif %}
+    {% if req.decision_note %}<dt>Note</dt><dd>{{ req.decision_note }}</dd>{% endif %}
+    {% if club %}<dt>Club créé</dt><dd>{{ club.name }}</dd>{% endif %}
+  </dl>
+  {% if req.message %}<h3>Message</h3><p style="white-space: pre-wrap">{{ req.message }}</p>{% endif %}
+</div>
+
+{% if req.status == 'pending' %}
+<div class="two-cols">
+  <form method="post" action="/admin/requests/{{ req.id }}/approve" class="card">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <h2 style="margin-top: 0">Accepter</h2>
+    <label>Nom du club <input name="club_name" maxlength="120" value="{{ req.club_name }}"></label>
+    <p class="muted">Crée le club et le compte administrateur de {{ req.contact_name }}.
+      {% if smtp_ok %}Un lien d'activation lui sera envoyé par email.{% else %}SMTP non configuré : un mot de passe provisoire vous sera affiché.{% endif %}</p>
+    <button>Accepter et créer le club</button>
+  </form>
+  <form method="post" action="/admin/requests/{{ req.id }}/reject" class="card">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <h2 style="margin-top: 0">Refuser</h2>
+    <label>Motif <small class="muted">(facultatif)</small> <textarea name="note" maxlength="500" rows="3"></textarea></label>
+    {% if smtp_ok %}<label class="inline"><input type="checkbox" name="notify" value="1" checked> Prévenir le demandeur par email</label>{% endif %}
+    <p><button class="danger">Refuser</button></p>
+  </form>
+</div>
+{% endif %}
+
+<form method="post" action="/admin/requests/{{ req.id }}/delete" onsubmit="return confirm('Supprimer définitivement cette demande et les données du demandeur ?')">
+  <input type="hidden" name="csrf" value="{{ csrf }}"><button class="secondary">Supprimer la demande</button></form>
+{% endblock %}

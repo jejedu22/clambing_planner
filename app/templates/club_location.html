@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Localisation du club — Climbing Planner{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">{% endblock %}
+{% block content %}
+<p><a href="/club">← Club</a></p>
+<div class="page-head"><h1>Localisation du club{% if club %} <small class="muted">— {{ club.name }}</small>{% endif %}</h1></div>
+{% if clubs %}
+<form class="filters" method="get" action="/admin/club-location">
+  <select name="club" onchange="this.form.submit()" aria-label="Club"><option value="">— Choisir un club —</option>
+    {% for c in clubs %}<option value="{{ c.id }}" {{ 'selected' if club and club.id == c.id }}>{{ c.name }}</option>{% endfor %}</select>
+  <noscript><button>Choisir</button></noscript>
+</form>
+{% endif %}
+{% if not club %}
+  <p class="muted">Choisissez un club.</p>
+{% else %}
+<p class="muted">La carte des sites s'ouvre centrée sur ce point, en incluant les favoris du club. Cliquez sur la carte (ou déplacez le repère) pour le choisir.</p>
+<form method="post" action="/admin/club-location" class="card">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  {% if user.is_super %}<input type="hidden" name="club_id" value="{{ club.id }}">{% endif %}
+  <div id="location-map" style="height: 380px; border-radius: 12px; border: 1px solid var(--line)"></div>
+  <p id="location-status" class="muted" role="status">{% if club.has_home %}Point actuel : {{ club.home_lat }}, {{ club.home_lon }}{% else %}Aucun point choisi.{% endif %}</p>
+  <div class="actions"><button type="button" id="use-position" class="secondary">Utiliser ma position</button></div>
+  <div class="two-cols">
+    <label>Latitude <input id="lat" name="lat" inputmode="decimal" value="{{ club.home_lat if club.has_home else '' }}" required></label>
+    <label>Longitude <input id="lon" name="lon" inputmode="decimal" value="{{ club.home_lon if club.has_home else '' }}" required></label>
+  </div>
+  <label>Nom du lieu <small class="muted">(facultatif, ex. « Gymnase du club, Melun »)</small>
+    <input name="label" maxlength="80" value="{{ club.home_label or '' }}"></label>
+  <div class="actions"><button>Enregistrer</button></div>
+</form>
+{% if club.has_home %}
+<form method="post" action="/admin/club-location">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  {% if user.is_super %}<input type="hidden" name="club_id" value="{{ club.id }}">{% endif %}
+  <button name="clear" value="1" class="secondary">Supprimer la localisation</button>
+</form>
+{% endif %}
+<script src="/static/vendor/leaflet/leaflet.js"></script>
+<script src="/static/club-location.js"></script>
+{% endif %}
+{% endblock %}

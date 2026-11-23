@@ -7,7 +7,7 @@ from ..models import TYPE_LABELS, Club, ClubFavorite, Site, User
 from ..security import login_required
 from ..services import weather
 from ..web import render
-from .favorites import favorite_ids
+from .favorites import favorite_ids, map_view
 
 router = APIRouter()
 PAGE = 30
@@ -44,6 +44,7 @@ def sites_page(request: Request, q: str = "", kind: str = "", outdoor: int = 1, 
     fav_ids = {r for r in db.scalars(select(ClubFavorite.site_id).where(ClubFavorite.club_id == user.club_id))} \
         if user.club_id else set()
     return render(request, "sites.html", rows=rows, total=total, q=q, kind=kind, fav=int(fav_only), fav_ids=fav_ids,
+                  view=map_view(db, user.club),
                   outdoor=outdoor, page=page, pages=max(1, -(-total // PAGE)), type_labels=TYPE_LABELS)
 
 

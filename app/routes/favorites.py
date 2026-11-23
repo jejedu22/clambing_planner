@@ -89,3 +89,56 @@ def favorite_remove(site_id: int, request: Request, club_id: str = Form(""), nex
         audit("favorite.removed", request, club_id=club.id, target=f"site:{site_id}")
         flash(request, "Site retiré des favoris.", "ok")
     return RedirectResponse(safe_next(next, f"/sites/{site_id}"), status_code=303)
+
+
+# --- Localisation du club (centre de la carte) ----------------------------------
+
+@router.get("/admin/club-location")
+def club_location_form(request: Request, club: int | None = None, user: User = Depends(admin_required),
+                       db: Session = Depends(get_db)):
+    current = db.get(Club, club if user.is_super else user.club_id) if (club or user.club_id) else None
+    clubs = db.scalars(select(Club).order_by(Club.name)).all() if user.is_super else []
+    return render(request, "club_location.html", club=current, clubs=clubs)
+
+
+@router.post("/admin/club-location")
+def club_location_save(request: Request, club_id: str = Form(""), lat: str = Form(""), lon: str = Form(""),
+                       label: str = Form(""), clear: str = Form(""), user: User = Depends(admin_required),
+                       db: Session = Depends(get_db)):
+    club = managed_club(user, db, club_id)
+    back = f"/admin/club-location?club={club.id}" if user.is_super else "/admin/club-location"
+    if clear:
+        club.home_lat = club.home_lon = club.home_label = None
+        db.commit()
+        audit("club.location_cleared", request, club_id=club.id, target=f"club:{club.id}")
+        flash(request, "Localisation supprimée : la carte s'ouvrira sur vos favoris ou sur la France.", "ok")
+        return RedirectResponse(back, status_code=303)
+    try:
+        la, lo = float(lat.replace(",", ".")), float(lon.replace(",", "."))
+        if not (-90 <= la <= 90 and -180 <= lo <= 180) or la != la or lo != lo:   # bornes + NaN
+            raise ValueError
+    except ValueError:
+        flash(request, "Choisissez un point sur la carte.", "error")
+        return RedirectResponse(back, status_code=303)
+    label = " ".join(label.split())
+    if len(label) > 80:
+        flash(request, "Nom trop long (80 caractères maximum).", "error")
+        return RedirectResponse(back, status_code=303)
+    club.home_lat, club.home_lon, club.home_label = round(la, 6), round(lo, 6), label or None
+    db.commit()
+    audit("club.location_set", request, club_id=club.id, target=f"club:{club.id}")
+    flash(request, "Localisation du club enregistrée.", "ok")
+    return RedirectResponse(back, status_code=303)
+
+
+def map_view(db: Session, club: Club | None) -> dict:
+    """Données de cadrage initial de la carte : localisation du club + favoris."""
+    if club is None:
+        return {"home": None, "fit": []}
+    fav = db.execute(select(Site.lat, Site.lon).join(ClubFavorite, ClubFavorite.site_id == Site.id)
+                     .where(ClubFavorite.club_id == club.id)).all()
+    home = {"lat": club.home_lat, "lon": club.home_lon, "label": club.home_label or club.name} if club.has_home else None
+    points = [[round(la, 5), round(lo, 5)] for la, lo in fav]
+    if home:
+        points.append([home["lat"], home["lon"]])
+    return {"home": home, "fit": points}

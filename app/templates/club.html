@@ -19,6 +19,7 @@
 <div class="hub">
   <a href="/admin/users">Membres<span>Comptes, rôles, import et export</span></a>
   <a href="/admin/memberships">Adhésions{% if todo and todo.expired %}<span>{{ todo.expired }} expirée(s) à relancer</span>{% else %}<span>Synchronisation HelloAsso</span>{% endif %}</a>
+  <a href="/admin/club-location">Localisation du club<span>{{ user.club.home_label or 'Centre de la carte des sites' if user.club and user.club.has_home else 'À définir : centre de la carte des sites' }}</span></a>
   <a href="/admin/integrations">Intégrations<span>Mailjet, HelloAsso</span></a>
   <a href="/admin/logs">Journal<span>Connexions et actions sensibles</span></a>
 </div>

@@ -44,6 +44,8 @@ Sauvegarde : volume Docker `pgdata` (`docker compose exec db pg_dump -U climbing
 
 Chaque club garde sa propre liste de sites favoris, avec une **note** facultative visible de ses membres (parking, accès, difficulté…). Les administrateurs de club les gèrent (bouton ☆/★ dans la liste des sites ou sur la fiche d'un site) ; les membres les consultent sur la page **⭐ Favoris**. Un club ne voit jamais les favoris ni les notes d'un autre club. Les favoris apparaissent avec une ⭐ dans la liste et sur la carte, se filtrent (*Favoris du club*) et sont proposés en premier quand on choisit le site d'une sortie. Le super administrateur gère les favoris de n'importe quel club depuis la fiche d'un site ou la page Favoris. Limite : 500 favoris par club.
 
+**Localisation du club** (*Club → Localisation du club*, administrateurs) : un point choisi sur une carte (ou la position de l'appareil), avec un nom facultatif. La carte des sites s'ouvre alors cadrée sur ce point **et** sur tous les favoris du club (repère « maison » sur la carte) ; sans localisation, sur les favoris ; sans les deux, sur la France. Aucun service de géocodage externe n'est utilisé.
+
 ## Gestion des utilisateurs
 
 - **Fiche** : prénom, nom, email (identifiant de connexion), téléphone (facultatif, normalisé au format international : `06 12 34 56 78` devient `+33612345678`), rôle, actif. Chacun modifie son prénom/nom/téléphone dans *Mon compte* ; l'email et le rôle ne se changent que par un administrateur (qui invalide alors les liens de réinitialisation en attente). Liste avec recherche (nom, email, téléphone) et pagination.

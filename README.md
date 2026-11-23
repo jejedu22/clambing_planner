@@ -39,6 +39,10 @@ Sauvegarde : volume Docker `pgdata` (`docker compose exec db pg_dump -U climbing
 - **`/creer-un-club`** : formulaire public de demande (nom et ville du club, responsable, email, téléphone et effectif facultatifs, message, consentement). Protégé par jeton CSRF, champ piège anti-robots et limites (3 demandes par heure et par IP, 2 par jour et par adresse) ; une seule demande en cours par adresse ; un nom de club existant est refusé. Les super administrateurs sont prévenus par email (SMTP), sans les coordonnées du demandeur.
 - **Gestion des demandes** (*Club → Demandes de clubs*, super administrateur) : liste par statut, fiche détaillée avec alertes (nom de club pris, email ayant déjà un compte). **Accepter** crée le club (nom modifiable) et le compte administrateur du demandeur, qui reçoit par SMTP un lien d'activation valable 7 jours (sans SMTP : mot de passe provisoire affiché). **Refuser** avec un motif facultatif, envoyé au demandeur si souhaité. **Supprimer** efface la demande et les données du demandeur. Tout est tracé dans le journal d'audit.
 
+## Clubs (super administrateur)
+
+*Club → Clubs* liste les clubs. **Modifier** ouvre la fiche d'un club : renommage (nom unique, casse ignorée, tracé dans le journal d'audit), résumé (membres, administrateurs, sorties, favoris, localisation, intégrations) et accès directs à ses membres, sa localisation, ses favoris, ses intégrations, ses adhésions et son journal. Un club sans membres ni sorties peut être supprimé.
+
 ## Interface
 
 - **Agenda** (accueil) : la semaine en tête (sorties du jour et météo du site), puis les sorties à venir avec la réponse **Je viens / Peut-être / Non** et les places de covoiturage directement depuis la liste. Colonne de droite : sorties en attente de réponse, covoiturage de la prochaine sortie et, pour les administrateurs, ce qui reste à faire pour le club.

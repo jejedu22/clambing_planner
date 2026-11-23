@@ -33,9 +33,11 @@ def clubs_page(request: Request, user: User = Depends(super_required), db: Sessi
 @router.post("/clubs")
 def club_create(request: Request, name: str = Form(...), user: User = Depends(super_required),
                 db: Session = Depends(get_db)):
-    name = name.strip()[:120]
+    name = " ".join(name.split())[:120]
     if not name:
         flash(request, "Nom de club obligatoire.", "error")
+    elif name_taken(db, name):
+        flash(request, "Ce club existe déjà.", "error")
     else:
         try:
             club = Club(name=name)
@@ -47,6 +49,58 @@ def club_create(request: Request, name: str = Form(...), user: User = Depends(su
             db.rollback()
             flash(request, "Ce club existe déjà.", "error")
     return RedirectResponse("/admin/clubs", status_code=303)
+
+
+def name_taken(db: Session, name: str, except_id: int | None = None) -> bool:
+    """Nom de club déjà utilisé (sans tenir compte de la casse)."""
+    q = select(Club.id).where(func.lower(Club.name) == name.lower())
+    if except_id is not None:
+        q = q.where(Club.id != except_id)
+    return db.scalar(q) is not None
+
+
+def _club_summary(db: Session, club: Club) -> dict:
+    users = db.scalars(select(User).where(User.club_id == club.id).order_by(User.last_name, User.first_name)).all()
+    integ = db.get(ClubIntegration, club.id)
+    return dict(
+        members=len(users), active=sum(1 for u in users if u.is_active),
+        admins=[u for u in users if u.role == Role.CLUB_ADMIN.value],
+        outings=db.scalar(select(func.count()).select_from(Outing).where(Outing.club_id == club.id)),
+        upcoming=db.scalar(select(func.count()).select_from(Outing).where(Outing.club_id == club.id, Outing.day >= today())),
+        favorites=db.scalar(select(func.count()).select_from(ClubFavorite).where(ClubFavorite.club_id == club.id)),
+        mailjet=bool(integ and integ.mailjet_ready), helloasso=bool(integ and integ.helloasso_ready))
+
+
+@router.get("/clubs/{club_id}/edit")
+def club_edit_form(club_id: int, request: Request, user: User = Depends(super_required), db: Session = Depends(get_db)):
+    club = db.get(Club, club_id)
+    if club is None:
+        raise HTTPException(404)
+    return render(request, "admin_club_edit.html", club=club, summary=_club_summary(db, club))
+
+
+@router.post("/clubs/{club_id}/edit")
+def club_edit(club_id: int, request: Request, name: str = Form(""), user: User = Depends(super_required),
+              db: Session = Depends(get_db)):
+    club = db.get(Club, club_id)
+    if club is None:
+        raise HTTPException(404)
+    new = " ".join(name.split())
+    error = None
+    if not 2 <= len(new) <= 120:
+        error = "Le nom doit contenir entre 2 et 120 caractères."
+    elif name_taken(db, new, except_id=club.id):
+        error = "Un autre club porte déjà ce nom."
+    if error:
+        return render(request, "admin_club_edit.html", 400, club=club, summary=_club_summary(db, club),
+                      error=error, form_name=name)
+    old = club.name
+    if new != old:
+        club.name = new
+        db.commit()
+        audit("club.renamed", request, club_id=club.id, target=f"club:{club.id}", detail=f"{old} -> {new}")
+        flash(request, f"Club renommé en « {new} ».", "ok")
+    return RedirectResponse(f"/admin/clubs/{club.id}/edit", status_code=303)
 
 
 @router.post("/clubs/{club_id}/delete")

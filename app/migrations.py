@@ -22,6 +22,7 @@ COLUMNS = [
     ("clubs", "home_lat", "FLOAT"),
     ("clubs", "home_lon", "FLOAT"),
     ("clubs", "home_label", "VARCHAR(80)"),
+    ("users", "pending", "BOOLEAN"),
 ]
 
 

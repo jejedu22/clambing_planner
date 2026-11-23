@@ -15,7 +15,7 @@ from .logging_setup import RequestLogMiddleware, setup_logging
 from .db import Base, SessionLocal, engine
 from .models import Role, User
 from .routes import (account, admin, auth, dashboard, favorites, integrations, logs, outings, people, public, pwa,
-                     requests_admin, sites)
+                     requests_admin, signup, sites)
 from .security import RedirectTo, hash_password, verify_csrf
 from .services import notifications, sites_import
 from .web import BASE, render
@@ -73,8 +73,8 @@ app.add_middleware(
 app.add_middleware(RequestLogMiddleware)   # dernier ajouté = le plus externe : voit toutes les requêtes
 app.mount("/static", StaticFiles(directory=BASE / "static"), name="static")
 
-for module in (pwa, auth, account, public, dashboard, favorites, sites, outings, people, admin, integrations, logs,
-               requests_admin):
+for module in (pwa, auth, account, public, signup, dashboard, favorites, sites, outings, people, admin, integrations,
+               logs, requests_admin):
     app.include_router(module.router)
 
 

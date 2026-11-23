@@ -59,6 +59,8 @@ def user_edit(user_id: int, request: Request, first_name: str = Form(""), last_n
     if not target.is_super:
         target.role = role
     target.is_active = active == "1"
+    if target.is_active:
+        target.pending = False
     if new_email != old_email:
         target.email = new_email
         # les liens en attente ont été envoyés à l'ancienne adresse : on les invalide

@@ -50,6 +50,9 @@ def login(request: Request, email: str = Form(...), password: str = Form(...),
 
     user = db.scalar(select(User).where(User.email == email))
     valid = verify_password(password, user.password_hash if user else DUMMY_HASH)
+    if user and valid and user.pending:
+        return render(request, "login.html", 403, email=email,
+                      error="Votre inscription attend la validation d'un administrateur du club.")
     if not (user and valid and user.is_active):
         _failures.setdefault(key, []).append(time.time())
         audit("login.failure", request, target=mask_email(email), club_id=user.club_id if user else None)

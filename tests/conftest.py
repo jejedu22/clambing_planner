@@ -15,7 +15,8 @@ from app.security import hash_password
 
 @pytest.fixture()
 def db():
-    from app.routes import account, auth, outings, public
+    from app.routes import account, auth, outings, public, signup
+    signup.by_ip.clear()
     public.by_ip.clear(); public.by_email.clear()
     auth._failures.clear()
     account.forgot_by_email.clear(); account.forgot_by_ip.clear()

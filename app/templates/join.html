@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Rejoindre un club — Climbing Planner{% endblock %}
+{% block head %}<meta name="referrer" content="no-referrer"><meta name="robots" content="noindex">{% endblock %}
+{% block content %}
+{% set f = form or {} %}
+<section class="card narrow" style="max-width: 600px">
+{% if invalid %}
+  <h1>Lien non valable</h1>
+  <p>Ce lien d'inscription a expiré, a été désactivé ou n'existe pas. Demandez un nouveau lien à l'administrateur de votre club.</p>
+  <p><a href="/login">J'ai déjà un compte</a></p>
+{% elif done == 'pending' %}
+  <h1>Inscription envoyée</h1>
+  <p>Merci ! Un administrateur de <strong>{{ club.name }}</strong> va valider votre inscription. Vous pourrez ensuite vous connecter avec votre email et votre mot de passe.</p>
+  <p><a href="/login">Aller à la connexion</a></p>
+{% else %}
+  <p class="eyebrow">Invitation</p>
+  <h1>Rejoindre {{ club.name }}</h1>
+  <p class="muted">Créez votre compte pour voir les sorties du club et y répondre.{% if link.requires_approval %} Votre inscription sera validée par un administrateur du club.{% endif %}</p>
+  <form method="post" action="/rejoindre/{{ token }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="hp" aria-hidden="true"><label>Site web <input name="website" tabindex="-1" autocomplete="off"></label></div>
+    <div class="two-cols">
+      <label>Prénom <input name="first_name" required maxlength="55" value="{{ f.first_name or '' }}" autocomplete="given-name"></label>
+      <label>Nom <input name="last_name" required maxlength="55" value="{{ f.last_name or '' }}" autocomplete="family-name"></label>
+    </div>
+    <label>Email <input type="email" name="email" required value="{{ f.email or '' }}" autocomplete="email"></label>
+    <label>Téléphone <small class="muted">(facultatif, visible des administrateurs du club)</small>
+      <input type="tel" name="phone" maxlength="32" value="{{ f.phone or '' }}" autocomplete="tel"></label>
+    <div class="two-cols">
+      <label>Mot de passe <small class="muted">(10 caractères minimum)</small> <input type="password" name="password" required minlength="10" autocomplete="new-password"></label>
+      <label>Confirmation <input type="password" name="confirm" required minlength="10" autocomplete="new-password"></label>
+    </div>
+    <label class="inline"><input type="checkbox" name="consent" value="1" required> J'accepte que mes informations soient utilisées par le club pour l'organisation des sorties.</label>
+    <p><button>Créer mon compte</button></p>
+  </form>
+{% endif %}
+</section>
+{% endblock %}
